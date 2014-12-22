@@ -1,0 +1,71 @@
+#
+# Build
+#
+
+build { core init drivers/timer drivers/rtc server/ram_fs test/libports/gmock }
+
+create_boot_directory
+
+#
+# Generate config
+#
+
+install_config {
+<config verbose="yes">
+	<parent-provides>
+		<service name="ROM"/>
+		<service name="RAM"/>
+		<service name="CAP"/>
+		<service name="RM"/>
+		<service name="PD"/>
+		<service name="LOG"/>
+		<service name="SIGNAL"/>
+		<service name="IO_PORT"/>
+	</parent-provides>
+	<default-route>
+		<any-service> <parent/> <any-child/> </any-service>
+	</default-route>
+
+	<start name="timer">
+		<resource name="RAM" quantum="1M"/>
+		<provides> <service name="Timer"/> </provides>
+	</start>
+
+	<start name="rtc_drv">
+		<resource name="RAM" quantum="1M"/>
+		<provides>
+			<service name="Rtc"/>
+		</provides>
+	</start>
+
+	<start name="ram_fs">
+		<resource name="RAM" quantum="4M"/>
+		<provides> <service name="File_system"/> </provides>
+		<config> <policy label="gmock" root="/" writeable="yes" /> </config>
+	</start>
+
+	<start name="gmock">
+		<resource name="RAM" quantum="4M"/>
+		<config>
+			<libc stdout="/dev/log" stderr="/dev/log" rtc="/dev/rtc">
+				<vfs>
+					<dir name="dev"> <log/> <rtc/> </dir>
+					<fs/>
+				</vfs>
+			</libc>
+			<arg value="gmock"/>
+			<arg value="--gtest_filter=-*Death*:*.*WhenVerbosityIs*:ExpectCallTest.TakesDefaultAction*:AssertTest.FailsFatally*:LogTest.*:*.LogsAnything*:*MockTest.*:*IsMandatory:*.DoesNotWarnOnAdequateActionCount:*.WarnsOn*:*.Reports*:*FunctionCallMessageTest.*:GMockVerboseFlagTest.*"/>
+		</config>
+	</start>
+</config>}
+
+#
+# Boot image
+#
+
+build_boot_image { core init timer rtc_drv libc.lib.so stdcxx.lib.so libm.lib.so ld.lib.so gtest.lib.so gmock.lib.so ram_fs gmock }
+
+append qemu_args " -nographic "
+
+run_genode_until {.*child "gmock" exited with exit value .*} 15000
+
