@@ -41,7 +41,7 @@ install_config {
 	<start name="ram_fs">
 		<resource name="RAM" quantum="4M"/>
 		<provides> <service name="File_system"/> </provides>
-		<config> <policy label="" root="/" writeable="yes" /> </config>
+		<config> <policy label="gtest -> " root="/" writeable="yes" /> </config>
 	</start>
 
 	<start name="gtest">
