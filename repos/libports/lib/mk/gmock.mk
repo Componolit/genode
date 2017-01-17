@@ -3,9 +3,9 @@ GTEST_DIR := $(call select_from_ports,googletest)/src/lib/googletest/googletest
 
 SHARED_LIB = yes
 
-SRC_CC = $(GMOCK_DIR)/src/gmock-all.cc
+SRC_CC = gmock-all.cc
 
-vpath %.cc += $(GMOCK_DIR)
+vpath %.cc $(GMOCK_DIR)/src
 
 INC_DIR += $(GMOCK_DIR)
 INC_DIR += $(GMOCK_DIR)/include

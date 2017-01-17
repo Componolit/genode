@@ -67,5 +67,4 @@ build_boot_image { core init timer rtc_drv ram_fs gtest libc.lib.so stdcxx.lib.s
 
 append qemu_args " -nographic "
 
-run_genode_until {.*child "gtest" exited with exit value .*} 15 
-
+run_genode_until {.*child "gtest" exited with exit value .*} 15

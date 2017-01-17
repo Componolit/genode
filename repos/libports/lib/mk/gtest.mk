@@ -1,8 +1,8 @@
 GTEST_DIR := $(call select_from_ports,googletest)/src/lib/googletest/googletest
 
-SRC_CC = $(GTEST_DIR)/src/gtest-all.cc
+SRC_CC = gtest-all.cc
 
-vpath %.cc += $(GTEST_DIR)
+vpath %.cc $(GTEST_DIR)/src
 
 INC_DIR += $(GTEST_DIR)
 INC_DIR += $(GTEST_DIR)/include

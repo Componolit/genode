@@ -3,16 +3,12 @@ TARGET = gmock
 GMOCK_DIR := $(call select_from_ports,googletest)/src/lib/googletest/googlemock
 GTEST_DIR := $(call select_from_ports,googletest)/src/lib/googletest/googletest
 
-SRC_CC += $(GMOCK_DIR)/test/gmock_all_test.cc
+SRC_CC = gmock_test.cc gtest_main.cc
 
-INC_DIR += $(GMOCK_DIR)
-INC_DIR += $(GMOCK_DIR)/include
-INC_DIR += $(GMOCK_DIR)/include/internal
+vpath gmock_test.cc $(GMOCK_DIR)/test
+vpath gtest_main.cc $(GTEST_DIR)/src
 
-INC_DIR += $(GTEST_DIR)
-INC_DIR += $(GTEST_DIR)/include
-INC_DIR += $(GTEST_DIR)/include/internal
+INC_DIR += $(GMOCK_DIR) $(GTEST_DIR)
+CC_OPT  += -DGTEST_HAS_PTHREAD=0
 
-CC_OPT += -DGTEST_HAS_PTHREAD=0
-
-LIBS = stdcxx config_args gtest gmock
+LIBS = config_args stdcxx gtest gmock
