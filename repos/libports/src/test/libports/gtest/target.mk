@@ -9,4 +9,4 @@ vpath gtest_all_test.cc $(GTEST_DIR)/test
 
 INC_DIR += $(GTEST_DIR)
 
-LIBS = config_args stdcxx gtest
+LIBS = config_args posix stdcxx gtest
