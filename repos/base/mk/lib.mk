@@ -110,6 +110,7 @@ endif
 #
 ifdef SHARED_LIB
 LIBGCC = $(shell $(CC) $(CC_MARCH) -print-libgcc-file-name)
+LIBGCC += $(shell $(CC) $(CC_MARCH) -print-file-name=libgcc_eh.a)
 endif
 
 #
