@@ -1,6 +1,8 @@
 GMOCK_DIR := $(call select_from_ports,googletest)/src/lib/googletest/googlemock
 GTEST_DIR := $(call select_from_ports,googletest)/src/lib/googletest/googletest
 
+include $(REP_DIR)/lib/import/import-gtest.mk
+
 SHARED_LIB = yes
 
 SRC_CC = gmock-all.cc
@@ -13,8 +15,5 @@ INC_DIR += $(GMOCK_DIR)/include/internal
 
 INC_DIR += $(GTEST_DIR)/include
 INC_DIR += $(GTEST_DIR)/include/internal
-
-CC_OPT += -DGTEST_HAS_PTHREAD=0
-CC_OPT += -DGTEST_HAS_RTTI=0
 
 LIBS += stdcxx

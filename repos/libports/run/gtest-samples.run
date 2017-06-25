@@ -2,7 +2,14 @@
 # Build
 #
 
-build { core init drivers/timer drivers/rtc test/libports/gtest-samples }
+set build_components {
+	core init
+	drivers/timer
+	drivers/rtc
+	test/libports/gtest-samples
+}
+
+build $build_components
 
 create_boot_directory
 
@@ -14,10 +21,10 @@ install_config {
 <config verbose="yes">
 	<parent-provides>
 		<service name="ROM"/>
-		<service name="RAM"/>
 		<service name="CAP"/>
 		<service name="RM"/>
 		<service name="PD"/>
+		<service name="CPU"/>
 		<service name="LOG"/>
 		<service name="SIGNAL"/>
 		<service name="IO_PORT"/>
@@ -25,6 +32,7 @@ install_config {
 	<default-route>
 		<any-service> <parent/> <any-child/> </any-service>
 	</default-route>
+	<default caps="100"/>
 
 	<start name="timer">
 		<resource name="RAM" quantum="1M"/>
@@ -33,19 +41,16 @@ install_config {
 
 	<start name="rtc_drv">
 		<resource name="RAM" quantum="1M"/>
-		<provides>
-			<service name="Rtc"/>
-		</provides>
+		<provides> <service name="Rtc"/> </provides>
 	</start>
 
 	<start name="gtest-samples">
 		<resource name="RAM" quantum="4M"/>
 		<config>
-			<libc stdout="/dev/log" stderr="/dev/log" rtc="/dev/rtc">
-				<vfs>
-					<dir name="dev"> <log/> <rtc/> </dir>
-				</vfs>
-			</libc>
+			<vfs>
+				<dir name="dev"> <log/> <rtc/> </dir>
+			</vfs>
+			<libc stdout="/dev/log" stderr="/dev/log" rtc="/dev/rtc" />
 		</config>
 	</start>
 </config>}
@@ -54,8 +59,14 @@ install_config {
 # Boot image
 #
 
-build_boot_image { core init timer rtc_drv gtest-samples libc.lib.so stdcxx.lib.so libm.lib.so ld.lib.so }
+build_boot_image {
+	core init ld.lib.so
+	timer
+	libc.lib.so libm.lib.so posix.lib.so stdcxx.lib.so
+	rtc_drv
+	gtest-samples
+}
 
 append qemu_args " -nographic "
 
-run_genode_until {.*child "gtest-samples" exited with exit value .*} 10
+run_genode_until {.*child "gtest-samples" exited with exit value 0} 1000

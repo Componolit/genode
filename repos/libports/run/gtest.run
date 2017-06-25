@@ -2,7 +2,15 @@
 # Build
 #
 
-build { core init drivers/timer drivers/rtc server/ram_fs test/libports/gtest }
+set build_components {
+	core init
+	drivers/timer
+	drivers/rtc
+	server/ram_fs
+	test/libports/gtest
+}
+
+build $build_components
 
 create_boot_directory
 
@@ -14,10 +22,10 @@ install_config {
 <config verbose="yes">
 	<parent-provides>
 		<service name="ROM"/>
-		<service name="RAM"/>
 		<service name="CAP"/>
 		<service name="RM"/>
 		<service name="PD"/>
+		<service name="CPU"/>
 		<service name="LOG"/>
 		<service name="SIGNAL"/>
 		<service name="IO_PORT"/>
@@ -25,6 +33,7 @@ install_config {
 	<default-route>
 		<any-service> <parent/> <any-child/> </any-service>
 	</default-route>
+	<default caps="100"/>
 
 	<start name="timer">
 		<resource name="RAM" quantum="1M"/>
@@ -33,9 +42,7 @@ install_config {
 
 	<start name="rtc_drv">
 		<resource name="RAM" quantum="1M"/>
-		<provides>
-			<service name="Rtc"/>
-		</provides>
+		<provides> <service name="Rtc"/> </provides>
 	</start>
 
 	<start name="ram_fs">
@@ -47,14 +54,11 @@ install_config {
 	<start name="gtest">
 		<resource name="RAM" quantum="4M"/>
 		<config>
-			<libc stdout="/dev/log" stderr="/dev/log" rtc="/dev/rtc">
-				<vfs>
-					<dir name="dev"> <log/> <rtc/> </dir>
-					<fs/>
-				</vfs>
-			</libc>
-			<arg value="gtest"/>
-			<arg value="--gtest_filter=-OutputFile*:Directory*Test.*:*Death*:InitGoogleTestTest.*:CaptureTest.*:RETest*:Thread*:Mutex*:EXPECT_PRED1Test.Function*"/>
+			<vfs>
+				<dir name="dev"> <log/> <rtc/> </dir>
+				<fs/>
+			</vfs>
+			<libc stdout="/dev/log" stderr="/dev/log" rtc="/dev/rtc" />
 		</config>
 	</start>
 </config>}
@@ -63,8 +67,14 @@ install_config {
 # Boot image
 #
 
-build_boot_image { core init timer rtc_drv ram_fs gtest libc.lib.so stdcxx.lib.so libm.lib.so ld.lib.so }
+build_boot_image {
+	core init ld.lib.so
+	timer ram_fs
+	libc.lib.so libm.lib.so posix.lib.so stdcxx.lib.so
+	rtc_drv
+	gtest
+}
 
 append qemu_args " -nographic "
 
-run_genode_until {.*child "gtest" exited with exit value .*} 15
+run_genode_until {.*child "gtest" exited with exit value 0} 1000
