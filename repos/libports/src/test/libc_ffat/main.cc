@@ -99,6 +99,8 @@ static void test(Genode::Xml_node node)
 
 	char const *dir_name      = "testdir";
 	char const *dir_name2     = "testdir2";
+	char const *dir_name3     = "testdir3";
+	char const *file_in_dir3  = "testdir3/test6.tst";
 	char const *file_name     = "test.tst";
 	char const *file_name2    = "test2.tst";
 	char const *file_name3    = "test3.tst";
@@ -296,6 +298,13 @@ static void test(Genode::Xml_node node)
 			CALL_AND_CHECK(ret, unlink("c/d"), (ret == 0), "symlink=%s", "c/d");
 			CALL_AND_CHECK(ret, stat("c/d", &stat_buf), (ret == -1), "symlink=%s", "c/d");
 		}
+
+		/* test stat */
+		int fd = -1, rv = -1;
+		struct stat st;
+		CALL_AND_CHECK(fd, creat(dir_name3, O_RDWR), fd >= 0, "file_name=%s", dir_name3);
+		close(fd);
+		CALL_AND_CHECK(rv, stat(dir_name3, &st), rv < 0 && errno == ENOTDIR, "stat=%s", file_in_dir3);
 
 		if (i < (iterations - 1))
 			sleep(2);
