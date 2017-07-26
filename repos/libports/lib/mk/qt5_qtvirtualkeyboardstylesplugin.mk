@@ -8,7 +8,7 @@ QT_DEFINES += -UQT_STATICPLUGIN
 
 include $(REP_DIR)/lib/mk/qt5.inc
 
-LIBS += qt5_qml qt5_quick
+LIBS += qt5_qml qt5_quick gallium
 
 # install the QtQuick QML plugin
 

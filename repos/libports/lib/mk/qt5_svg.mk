@@ -2,7 +2,7 @@ include $(REP_DIR)/lib/import/import-qt5_svg.mk
 
 SHARED_LIB = yes
 
-LIBS	+= mesa zlib
+LIBS	+= gallium zlib
 
 include $(REP_DIR)/lib/mk/qt5_svg_generated.inc
 

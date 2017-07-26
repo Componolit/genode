@@ -14,8 +14,8 @@ vpath % $(QMAKE_PROJECT_PATH)
 
 include $(QT5_REP_DIR)/src/app/qt5/tmpl/target_defaults.inc
 
-CC_CXX_OPT += -D'MAIN_QML="basic-b2qt.qml"'
+CC_CXX_OPT += -D'MAIN_QML="Basic.qml"'
 
 include $(QT5_REP_DIR)/src/app/qt5/tmpl/target_final.inc
 
-LIBS += qt5_component qt5_qtvirtualkeyboardplugin qt5_windowplugin
+LIBS += qt5_component qt5_qtvirtualkeyboardplugin
