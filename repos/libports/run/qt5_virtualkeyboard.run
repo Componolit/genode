@@ -87,6 +87,7 @@ append boot_modules {
 	qt5_qtvirtualkeyboardplugin.lib.so
 	qt5_qtvirtualkeyboardstylesplugin.lib.so
 	qt5_widgets.lib.so
+        qt5_windowplugin.lib.so
 	qt5_xml.lib.so
 	zlib.lib.so
 	stdcxx.lib.so
