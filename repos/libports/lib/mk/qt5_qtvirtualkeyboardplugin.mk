@@ -8,7 +8,7 @@ QT_DEFINES += -UQT_STATICPLUGIN
 
 include $(REP_DIR)/lib/mk/qt5.inc
 
-LIBS += qt5_qml qt5_quick gallium qt5_svg qt5_qtvirtualkeyboardstylesplugin qt5_qquicklayoutsplugin  qt5_qmlfolderlistmodelplugin
+LIBS += qt5_qml qt5_quick qt5_svg qt5_qtvirtualkeyboardstylesplugin qt5_qquicklayoutsplugin  qt5_qmlfolderlistmodelplugin mesa
 
 # install the QtQuick QML plugin
 
