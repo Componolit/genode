@@ -8,7 +8,7 @@ QT_DEFINES += -UQT_STATICPLUGIN
 
 include $(REP_DIR)/lib/mk/qt5.inc
 
-LIBS += qt5_qml gallium
+LIBS += qt5_qml mesa
 
 # install the QtQuick QML plugin
 
