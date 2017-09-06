@@ -1,0 +1,20 @@
+--- a/src/main.cpp	2017-09-06 11:06:51.247451428 +0200
++++ b/src/main.cpp	2017-09-06 11:06:32.726952888 +0200
+@@ -18,6 +18,7 @@
+  */
+ 
+ #include <QtCore>
++#include "browsermainwindow.h"
+ #include "browserapplication.h"
+ 
+ #ifdef Q_OS_WIN
+@@ -39,7 +40,8 @@
+ #ifdef Q_OS_WIN
+     application.setStyle(new ExplorerStyle);
+ #endif
+-    application.newMainWindow();
++    auto *window = application.newMainWindow();
++	window->setFixedWidth(540);
+     return application.exec();
+ }
+ 
