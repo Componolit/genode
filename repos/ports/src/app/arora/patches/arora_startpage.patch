@@ -17,7 +17,7 @@ index 060f513..2c6a82a 100644
      if (url.scheme() == QLatin1String("about")
          && url.path() == QLatin1String("home"))
 -        url = QUrl(QLatin1String("qrc:/startpage.html"));
-+        url = QUrl(QLatin1String("qrc:/demo/intro.html"));
++        url = QUrl(QLatin1String("qrc:/foundations/introduction.html"));
  
      // QUrl::isValid() is too much tolerant.
      // We actually want to check if the url conforms to the RFC, which QUrl::isValid() doesn't state.
@@ -30,7 +30,7 @@ index 42daf7a..e2e7265 100644
  
          if (frame->url().scheme() == QLatin1String("qrc")
 -            && frame->url().path() == QLatin1String("/startpage.html")) {
-+            && frame->url().path() == QLatin1String("/demo/intro.html")) {
++            && frame->url().path() == QLatin1String("/foundations/introduction.html")) {
  
              if (!m_javaScriptAroraObject)
                  m_javaScriptAroraObject = new JavaScriptAroraObject(this);

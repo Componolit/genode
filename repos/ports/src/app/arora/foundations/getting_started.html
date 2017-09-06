@@ -1,0 +1,988 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
+ "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head><title>Genode OS Framework Foundations</title></head>
+<body>
+ <h1>
+ <a id="Getting_started"></a>
+ Getting started</h1>
+  <p>
+   Genode can be approached from two different angles: as an operating-system
+   architecture or as a practical tool kit. This chapter assists you with
+   exploring Genode as the latter. After introducing the recommended
+   development environment,
+   it guides you through the steps needed to obtain the source code
+   (Section <a href="#Obtaining_the_source_code">Obtaining the source code</a>), to use the tool chain
+   (Section <a href="#Using_the_build_system">Using the build system</a>), to test-drive system scenarios
+   (Section <a href="#A_simple_system_scenario">A simple system scenario</a>), and to create your first custom
+   component from scratch (Section <a href="#Hello_world">Hello world</a>).
+  </p>
+  <h4>
+  <a id="Recommended_development_environment"></a>
+  Recommended development environment</h4>
+   <p>
+    Genode is regularly used and developed on GNU/Linux. It is recommended to
+    use the latest long-term support (LTS) version of Ubuntu. Make sure that your
+    installation satisfies the following requirements:
+   </p>
+   <ul>
+    <li>
+     <p>
+      GNU Make version 3.81 (or newer) needed by the build system,
+     </p>
+    </li>
+    <li>
+     <p>
+      <i>libSDL-dev</i> needed to run system scenarios directly on Linux,
+     </p>
+    </li>
+    <li>
+     <p>
+      <i>tclsh</i> and <i>expect</i> needed by test-automation and work-flow tools,
+     </p>
+    </li>
+    <li>
+     <p>
+      <i>qemu</i> and <i>genisoimage</i> needed for testing system scenarios on non-Linux
+      platforms via the Qemu emulator.
+     </p>
+    </li>
+   </ul>
+   <p>
+    For using the entire collection of ported 3rd-party software, the following
+    packages should be installed additionally:
+    <i>byacc</i>, <i>autoconf2.64</i>, <i>autogen</i>, <i>bison</i>, <i>flex</i>, <i>g++</i>, <i>git</i>, <i>gperf</i>,
+    <i>libxml2-utils</i>, <i>subversion</i>, and <i>xsltproc</i>.
+   </p>
+  <h4>
+  <a id="Seeking_help"></a>
+  Seeking help</h4>
+   <p>
+    The best way to get assistance while exploring Genode is to consult the
+    mailing list, which is the primary communication medium of regular
+    users and developers alike. Please feel welcome to join in!
+   </p>
+   <div><dl>
+    <dt>Mailing Lists</dt>
+    <dd>
+     <p>
+      <a href="http://genode.org/community/mailing-lists">http://genode.org/community/mailing-lists</a>
+     </p>
+    </dd>
+   </dl></div>
+   <p>
+    If you encounter a new bug, ambiguous documentation, or a missing feature,
+    please consider opening a corresponding issue at the issue tracker:
+   </p>
+   <div><dl>
+    <dt>Issue tracker</dt>
+    <dd>
+     <p>
+      <a href="https://github.com/genodelabs/genode/issues">https://github.com/genodelabs/genode/issues</a>
+     </p>
+    </dd>
+   </dl></div>
+  <h2>
+  <a id="Obtaining_the_source_code"></a>
+  Obtaining the source code</h2>
+   <p>
+    The centerpiece of Genode is the source code found within the official Git
+    repository:
+   </p>
+   <div><dl>
+    <dt>Source code at GitHub</dt>
+    <dd>
+     <p>
+      <a href="https://github.com/genodelabs/genode">https://github.com/genodelabs/genode</a>
+     </p>
+    </dd>
+   </dl></div>
+   <p>
+    To obtain the source code, clone the Git repository:
+   </p>
+<pre>
+ git clone https://github.com/genodelabs/genode.git
+</pre>
+   <p>
+    After cloning, you can find the source code within
+    the <i>genode/</i> directory. In the following, we refer to this directory
+    as <i>&lt;genode-dir&gt;</i>.
+   </p>
+  <h2>
+  <a id="Source-tree_structure"></a>
+  Source-tree structure</h2>
+   <h4>
+   <a id="Top-level_directory"></a>
+   Top-level directory</h4>
+    <p>
+     At the root of the directory tree, there is the following content:
+    </p>
+    <div><dl>
+     <dt><i>doc/</i></dt>
+     <dd>
+      <p>
+       Documentation in plain text format, including the
+       release notes
+       of all versions. <i>Practical hint:</i> The comprehensive release notes
+       conserve most of the hands-on documentation aggregated over the lifetime
+       of the project. When curious about a certain topic, it is often worthwhile to
+       "grep" for the topic within the release notes to get a starting point
+       for investigation.
+      </p>
+     </dd>
+     <dt><i>tool/</i></dt>
+     <dd>
+      <p>
+       Tools and scripts to support the build system, various boot loaders,
+       the tool chain, and the management of 3rd-party source code. Please find
+       more information in the <i>README</i> file contained in the subdirectory.
+      </p>
+     </dd>
+     <dt><i>repos/</i></dt>
+     <dd>
+      <p>
+       The so-called source-code repositories, which contain the actual
+       source code of the framework components. The source code is not organized
+       within a single source tree but multiple trees. Each tree is called a
+       <i>source-code repository</i> and has the same principle structure.
+       At build time, a set of source-code repositories can be selected to be
+       incorporated into the build process. Thereby, the source-code repositories
+       provide a coarse-grained modularization of the framework.
+      </p>
+     </dd>
+    </dl></div>
+   <h4>
+   <a id="Repositories_overview"></a>
+   Repositories overview</h4>
+    <p>
+     The <i>&lt;genode-dir&gt;/repos/</i> directory contains the following source-code
+     repositories.
+    </p>
+    <div><dl>
+     <dt><i>base/</i></dt>
+     <dd>
+      <p>
+       The fundamental framework interfaces as well as the platform-agnostic parts
+       of the core component (Section <a href="architecture.html#Core_-_the_root_of_the_component_tree">Core - the root of the component tree</a>).
+      </p>
+     </dd>
+     <dt><i>base-&lt;platform&gt;/</i></dt>
+     <dd>
+      <p>
+       Platform-specific supplements of the <i>base/</i> repository where <i>&lt;platform&gt;</i>
+       corresponds to one of the following:
+      </p>
+      <div><dl>
+       <dt><i>linux</i></dt>
+       <dd>
+        <p>
+         Linux kernel (both x86_32 and x86_64).
+        </p>
+       </dd>
+       <dt><i>nova</i></dt>
+       <dd>
+        <p>
+         NOVA microhypervisor.
+         More information about the NOVA platform is provided by Section
+         <a href="under_the_hood.html#Execution_on_the_NOVA_microhypervisor__base-nova_">Execution on the NOVA microhypervisor (base-nova)</a>.
+        </p>
+       </dd>
+       <dt><i>hw</i></dt>
+       <dd>
+        <p>
+         The hw platform allows the execution of Genode on bare hardware
+         without the need for a separate kernel. The kernel functionality is
+         included in the core component. It supports the ARM, 64-bit x86,
+         and 64-bit RISC-V CPU architectures. The hw platform is also used as the
+         basis for executing Genode on top of the Muen separation kernel.
+         More information about the hw platform can be found in Section
+         <a href="under_the_hood.html#Execution_on_bare_hardware__base-hw_">Execution on bare hardware (base-hw)</a>.
+        </p>
+       </dd>
+       <dt><i>sel4</i></dt>
+       <dd>
+        <p>
+         The seL4 microkernel developed by NICTA in Sydney. The support for this
+         kernel is highly experimental.
+        </p>
+       </dd>
+       <dt><i>foc</i></dt>
+       <dd>
+        <p>
+         Fiasco.OC is a modernized version of the L4/Fiasco microkernel with a
+         completely revised kernel interface fostering capability-based
+         security.
+        </p>
+       </dd>
+       <dt><i>okl4</i></dt>
+       <dd>
+        <p>
+         OKL4 kernel originally developed at Open-Kernel-Labs.
+        </p>
+       </dd>
+       <dt><i>pistachio</i></dt>
+       <dd>
+        <p>
+         L4ka::Pistachio kernel developed at University of Karlsruhe.
+        </p>
+       </dd>
+       <dt><i>fiasco</i></dt>
+       <dd>
+        <p>
+         L4/Fiasco kernel originally developed at Technische Universität Dresden.
+        </p>
+       </dd>
+      </dl></div>
+     </dd>
+     <dt><i>os/</i></dt>
+     <dd>
+      <p>
+       OS components such as the init component, device drivers, and basic system
+       services.
+      </p>
+     </dd>
+     <dt><i>demo/</i></dt>
+     <dd>
+      <p>
+       Various services and applications used for demonstration purposes, for
+       example the graphical application launcher and the tutorial browser
+       described in Section <a href="#A_simple_system_scenario">A simple system scenario</a> can be found here.
+      </p>
+     </dd>
+     <dt><i>hello_tutorial/</i></dt>
+     <dd>
+      <p>
+       Tutorial for creating a simple client-server scenario. This
+       repository includes documentation and the complete source code.
+      </p>
+     </dd>
+     <dt><i>libports/</i></dt>
+     <dd>
+      <p>
+       Ports of popular open-source libraries, most importantly the C library.
+       Among the 3rd-party libraries are Qt5, libSDL, freetype, Python, ncurses,
+       Mesa, and libav.
+      </p>
+     </dd>
+     <dt><i>dde_linux/</i></dt>
+     <dd>
+      <p>
+       Device-driver environment for executing Linux kernel subsystems as
+       user-level components. Among the subsystems are the USB stack, the
+       Intel wireless stack, and the TCP/IP stack.
+      </p>
+     </dd>
+     <dt><i>dde_ipxe/</i></dt>
+     <dd>
+      <p>
+       Device-driver environment for executing network drivers of the iPXE project.
+      </p>
+     </dd>
+     <dt><i>dde_bsd/</i></dt>
+     <dd>
+      <p>
+       Device-driver environment for audio drivers ported from OpenBSD.
+      </p>
+     </dd>
+     <dt><i>dde_rump/</i></dt>
+     <dd>
+      <p>
+       Port of rump kernels, which are used to execute subsystems of the NetBSD
+       kernel as user-level components.
+       The repository contains a server that uses a rump kernel to provide
+       various NetBSD file systems.
+      </p>
+     </dd>
+     <dt><i>ports/</i></dt>
+     <dd>
+      <p>
+       Ports of 3rd-party applications.
+      </p>
+     </dd>
+     <dt><i>gems/</i></dt>
+     <dd>
+      <p>
+       Components that use
+       both native Genode interfaces as well as features of other high-level
+       repositories, in particular shared libraries provided by <i>libports/</i>.
+      </p>
+     </dd>
+    </dl></div>
+  <h2>
+  <a id="Using_the_build_system"></a>
+  Using the build system</h2>
+   <p>
+    Genode relies on a custom tool chain, which can be downloaded at the following
+    website:
+   </p>
+   <div><dl>
+    <dt>Tool chain</dt>
+    <dd>
+     <p>
+      <a href="http://genode.org/download/tool-chain">http://genode.org/download/tool-chain</a>
+     </p>
+    </dd>
+   </dl></div>
+   <h4>
+   <a id="Build_directory"></a>
+   Build directory</h4>
+    <p>
+     The build system never touches the source tree but generates object
+     files, libraries, and programs in a dedicated build directory. We do not have a
+     build directory yet. For a quick start, let us create one using the following
+     command:
+    </p>
+<pre>
+ cd &lt;genode-dir&gt;
+ ./tool/create_builddir x86_64
+</pre>
+    <p>
+     <i>To follow the subsequent steps of test driving the Linux version of Genode,</i>
+     <i>the specified platform argument should match your host OS installation. If</i>
+     <i>you are using a 32-bit installation, specify <tt>x86_32</tt> instead of <tt>x86_64</tt>.</i>
+    </p>
+    <p>
+     The command creates a new build directory at <tt>build/x86_64</tt>.
+    </p>
+   <h4>
+   <a id="Build_configuration"></a>
+   Build configuration</h4>
+    <p>
+     Before using the build directory, it is recommended to revisit and
+     possibly adjust the build configuration, which is located in the
+     <i>etc/</i> subdirectory of the build directory, e.g., <i>build/x86_64/etc/</i>.
+     The <i>build.conf</i> file contains global build parameters, in particular
+     the selection of source-code repositories to be incorporated. It is also
+     a suitable place for adding global build options. For example, for
+     enabling GNU make to use 4 CPU cores, add the following line to the
+     <i>build.conf</i> file:
+    </p>
+<pre>
+ MAKE += -j4
+</pre>
+   <h4>
+   <a id="Building_components"></a>
+   Building components</h4>
+    <p>
+     The recipe for building a component has the form of a <i>target.mk</i> file
+     within the <i>src/</i> directory of one of the source-code repositories.
+     For example, the <i>target.mk</i> file of the init component is located
+     at <i>&lt;genode-dir&gt;/repos/os/src/init/target.mk</i>. To build the component, execute
+     the following command from within the build directory:
+    </p>
+<pre>
+ make init
+</pre>
+    <p>
+     The argument "init" refers to the path relative to the <i>src/</i> subdirectory.
+     The build system determines and builds all targets found under this path in
+     all source-code repositories.
+     When the build the is finished, the resulting executable binary can be found
+     in a subdirectory that matches the target's path. Additionally, the build
+     system installs a symbolic link in the <i>bin/</i> subdirectory that points to the
+     executable binary.
+    </p>
+    <p>
+     If the specified path contains multiple <i>target.mk</i> files in different
+     subdirectories, the build system builds all of them. For example, the
+     following command builds all targets found within one of the
+     <i>&lt;repo&gt;/src/drivers/</i> subdirectories:
+    </p>
+<pre>
+ make drivers
+</pre>
+    <p>
+     Furthermore, it is possible to specify multiple targets at once. The following
+     command builds both the init component and the timer driver:
+    </p>
+<pre>
+ make init drivers/timer
+</pre>
+  <h2>
+  <a id="A_simple_system_scenario"></a>
+  A simple system scenario</h2>
+   <p>
+    The build directory offers much more than an environment for building
+    components. It supports the automation of system-integration work flows,
+    which typically include the following steps:
+   </p>
+   <ol>
+    <li>
+     <p>
+      Building a set of components,
+     </p>
+    </li>
+    <li>
+     <p>
+      Configuring the static part of a system scenario,
+     </p>
+    </li>
+    <li>
+     <p>
+      Assembling a boot directory with all ingredients needed by the scenario,
+     </p>
+    </li>
+    <li>
+     <p>
+      Creating a boot image that can be loaded onto the target platform,
+     </p>
+    </li>
+    <li>
+     <p>
+      Booting the target platform with the boot image,
+     </p>
+    </li>
+    <li>
+     <p>
+      Validating the behavior of the scenario.
+     </p>
+    </li>
+   </ol>
+   <p>
+    The recipe for such a sequence of steps can be expressed in the form of
+    a so-called run script. Each run script represents a system scenario and
+    entails all information required to reproduce the scenario. Run scripts can
+    reside within the <i>run/</i> subdirectory of any source-code repository.
+   </p>
+   <p>
+    Genode comes with a ready-to-use run script showcasing simple graphical demo
+    scenario. It is located at <i>&lt;genode-dir&gt;/repos/os/run/demo.run</i> and can
+    be executed from within the build directory via:
+   </p>
+<pre>
+ make run/demo KERNEL=linux
+</pre>
+   <p>
+    In contrast to the building of individual components as described above,
+    the integration of a complete system scenario requires us to select a
+    particular OS kernel to use. The command instructs the build system to
+    integrate and start the "run/demo" scenario on the Linux kernel.
+    It will lookup a run script called <i>demo.run</i> in all repositories
+    listed in <i>etc/build.conf</i>. It will eventually find the run script within
+    the <i>os/</i> repository. After completing the build of all components needed,
+    the command will then automatically start the scenario.
+    Because the build directory was created for the <i>x86_64</i> platform and we
+    specified "linux" as <tt>KERNEL</tt>, the scenario will be executed directly on the
+    host system where each Genode component resides in a distinct Linux process.
+    To explore the scenario, follow the instructions given by the graphical
+    tutorial browser.
+   </p>
+   <p>
+    The terminal where the <tt>make&nbsp;run/demo</tt> command was issued displays the log
+    output of the Genode system. To cancel the execution,
+    hit <i>control-c</i> in the terminal.
+   </p>
+   <h4>
+   <a id="Targeting_a_microkernel"></a>
+   Targeting a microkernel</h4>
+    <p>
+     Whereas the ability to run system scenarios on top of Linux allows for the
+     convenient and rapid development of components and protocols, Genode is
+     primarily designed for the use of microkernels. The choice of the microkernel
+     to use is up to the user of the framework and may depend on various factors
+     like the feature set, the supported hardware architectures, the license, or
+     the development community. To execute the demo scenario directly on the NOVA
+     microhypervisor, the following preparatory steps are needed:
+    </p>
+    <ol>
+     <li>
+      <p>
+       Download the 3rd-party source code of the NOVA microhypervisor
+      </p>
+<pre>
+ &lt;genode-dir&gt;/tool/ports/prepare_port nova
+</pre>
+      <p>
+       The <i>prepare_port</i> tool downloads the source code of NOVA to a
+       subdirectory at <i>&lt;genode-dir&gt;/contrib/nova-&lt;hash&gt;/</i> where <i>&lt;hash&gt;</i>
+       uniquely refers to the prepared version of NOVA.
+      </p>
+     </li>
+     <li>
+      <p>
+       On real hardware, the scenario needs a framebuffer driver. The VESA
+       driver relies on a 3rd-party x86-emulation library in order to execute
+       the VESA BIOS code. Download the 3rd-party source code of the <i>x86emu</i>
+       library:
+      </p>
+<pre>
+ &lt;genode-dir&gt;/tool/ports/prepare_port x86emu
+</pre>
+      <p>
+       The source code will be downloaded to <i>&lt;genode-dir&gt;/contrib/x86emu-&lt;hash&gt;/</i>.
+      </p>
+     </li>
+     <li>
+      <p>
+       Since NOVA supports the x86_64 architecture of our build directory, we
+       can keep using the existing build directory that we just used for Linux.
+       However, apart from enabling the parallelization of the build process as
+       mentioned in Section <a href="#Using_the_build_system">Using the build system</a>, we need to incorporate
+       the <i>libports</i> source-code repository into the build process by uncommenting
+       the corresponding line in the configuration. Otherwise the build system
+       would fail to build the VESA driver, which resides within <i>libports/</i>.
+      </p>
+     </li>
+    </ol>
+    <p>
+     With those preparations in place, issue the execution of the demo run
+     script from within the build directory:
+    </p>
+<pre>
+ make run/demo KERNEL=nova
+</pre>
+    <p>
+     This time, an instance of Qemu will be started to execute the demo scenario.
+     The Qemu command-line arguments appear in the log output. As suggested
+     by the arguments, the scenario is supplied to Qemu as an ISO image residing
+     at <i>var/run/demo.iso</i>. This ISO image can not only be used with Qemu but
+     also with a real machine. For example, creating a bootable USB stick with
+     the system scenario is as simple as writing the ISO image onto an USB stick:
+    </p>
+<pre>
+ sudo dd if=var/run/demo.iso of=/dev/&lt;usb-device&gt; bs=8M conv=fsync
+</pre>
+    <p>
+     Note that <i>&lt;usb-device&gt;</i> refers to the device node of an USB stick. It can be
+     determined using the <tt>dmesg</tt> command after plugging-in the USB stick.
+     For booting from the USB stick, you may need to adjust the BIOS
+     settings of the test machine accordingly.
+    </p>
+  <h2>
+  <a id="Hello_world"></a>
+  Hello world</h2>
+   <p>
+    This section introduces the steps needed to create and execute a simple
+    custom component that prints a hello-world message.
+   </p>
+   <h3>
+   <a id="Using_a_custom_source-code_repository"></a>
+   Using a custom source-code repository</h3>
+   <div class="subsection">
+    <p>
+     In principle, it would be possible to add a new component to one of the
+     existing source-code repositories found at <i>&lt;genode-dir&gt;/repos/</i>. However,
+     unless the component is meant to be incorporated into upstream development
+     of the Genode project, it is generally recommended to keep custom code
+     separate from Genode's code base. This eases future updates to new versions
+     of Genode and allows you to pick a revision-control system of your choice.
+    </p>
+    <p>
+     The new repository must appear within the <i>&lt;genode-dir&gt;/repos/</i> directory.
+     This can be achieved by either hosting it as a subdirectory or by creating
+     a symbolic link that points to an arbitrary location of your choice. For
+     now, let us host a new source-code repository called "lab" directly within
+     the <i>repos/</i> directory.
+    </p>
+<pre>
+ cd &lt;genode-dir&gt;
+ mkdir repos/lab
+</pre>
+    <p>
+     The lab repository will contain the source code and build rules for a
+     single component as well as a run script for executing the component within
+     Genode. Component source code reside in a <i>src/</i> subdirectory. By convention,
+     the <i>src/</i> directory contains further subdirectories for hosting different
+     types of components, in particular <i>server</i> (services and protocol stacks),
+     <i>drivers</i> (hardware-device drivers), and <i>app</i> (applications). For the
+     hello-world component, an appropriate location would be _src/app/hello/_:
+    </p>
+<pre>
+ mkdir -p repos/lab/src/app/hello
+</pre>
+   </div>
+   <h3>
+   <a id="Source_code_and_build_description"></a>
+   Source code and build description</h3>
+   <div class="subsection">
+    <p>
+     The <i>hello/</i> directory contains both the source code and the build description
+     of the component. The main part of each component typically resides in a
+     file called <i>main.cc</i>. Hence, for a hello-world program, we have to create
+     the <i>repos/lab/src/app/hello/main.cc</i> file with the following content:
+    </p>
+<pre>
+ #include &lt;base/component.h&gt;
+ #include &lt;base/log.h&gt;
+
+ void Component::construct(Genode::Env &)
+ {
+   Genode::log("Hello world");
+ }
+</pre>
+    <p>
+     The <i>base/component.h</i> header contains the interface each component must
+     implement.
+     The <tt>construct</tt> function is called by the component's execution environment
+     to initialize the component. The interface to the execution environment is
+     passed as argument. This interface allows the application code to interact
+     with the outside world. The simple example above merely produces a log
+     message. The <tt>log</tt> function is defined in the <i>base/log.h</i> header.
+    </p>
+    <p>
+     The component does not exit after the <tt>construct</tt> function returns. Instead,
+     it becomes ready to respond to requests or signals originating from other
+     components. The example above does not interact with other components though.
+     Hence, it will just keep waiting infinitely.
+    </p>
+    <p>
+     Please note that there exists a recommended coding style for genuine Genode
+     components. If you consider submitting your work to the upstream development
+     of the project, please pay attention to these common guidelines.
+    </p>
+    <div><dl>
+     <dt>Coding-style guidelines</dt>
+     <dd>
+      <p>
+       http://genode.org/documentation/developer-resources/coding_style
+      </p>
+     </dd>
+    </dl></div>
+    <p>
+     The source file <i>main.cc</i> is accompanied by a build-description file called
+     <i>target.mk</i>. It contains the declarations for the source files, the libraries
+     used by the component, and the name of the component. Create the file
+     <i>repos/lab/src/app/hello/target.mk</i> with the following content:
+    </p>
+<pre>
+ TARGET = hello
+ SRC_CC = main.cc
+ LIBS  += base
+</pre>
+   </div>
+   <h3>
+   <a id="Building_the_component"></a>
+   Building the component</h3>
+   <div class="subsection">
+    <p>
+     With the build-description file in place, it is time to build the new
+     component, for example from within the <i>x86_64</i> build directory as
+     created in Section <a href="#A_simple_system_scenario">A simple system scenario</a>. To aid the build system
+     to find the component, we have to extend the build
+     configuration <i>&lt;build-dir&gt;/etc/build.conf</i> by appending the following line:
+    </p>
+<pre>
+ REPOSITORIES += $(GENODE_DIR)/repos/lab
+</pre>
+    <p>
+     By adding this line, the build system will consider our custom source-code
+     repository. To build the component, issue the following command:
+    </p>
+<pre>
+ make app/hello
+</pre>
+    <p>
+     This step compiles the <i>main.cc</i>
+     file and links the executable ELF binary called "hello". The result can be
+     found in the <i>&lt;build-dir&gt;/app/hello/</i> subdirectory.
+    </p>
+   </div>
+   <h3>
+   <a id="Defining_a_system_scenario"></a>
+   Defining a system scenario</h3>
+   <div class="subsection">
+    <p>
+     For testing the component, we need to define a system scenario that
+     incorporates the component. As mentioned in
+     Section <a href="#A_simple_system_scenario">A simple system scenario</a>, such a description has the form of
+     a run script. To equip the <i>lab</i> repository with a run script, we first
+     need to create a <i>lab/run/</i> subdirectory:
+    </p>
+<pre>
+ mkdir &lt;genode-dir&gt;/repos/lab/run
+</pre>
+    <p>
+     Within this directory, we create the file
+     <i>&lt;genode-dir&gt;/repos/lab/run/hello.run</i> with the following content:
+    </p>
+<pre>
+build "core init app/hello"
+create_boot_directory
+install_config {
+ &lt;config&gt;
+   &lt;parent-provides&gt;
+     &lt;service name="LOG"/&gt;
+     &lt;service name="PD"/&gt;
+     &lt;service name="CPU"/&gt;
+     &lt;service name="ROM"/&gt;
+   &lt;/parent-provides&gt;
+   &lt;default-route&gt;
+     &lt;any-service&gt; &lt;parent/&gt; &lt;/any-service&gt;
+   &lt;/default-route&gt;
+   &lt;default caps="100"/&gt;
+   &lt;start name="hello"&gt;
+     &lt;resource name="RAM" quantum="10M"/&gt;
+   &lt;/start&gt;
+ &lt;/config&gt;
+}
+build_boot_image "core ld.lib.so init hello"
+append qemu_args "-nographic -m 64"
+run_genode_until {Hello world.*\n} 10
+</pre>
+    <p>
+     This run script performs the following steps:
+    </p>
+    <ol>
+     <li>
+      <p>
+       It builds the components core, init, and app/hello.
+      </p>
+     </li>
+     <li>
+      <p>
+       It creates a fresh boot directory at <i>&lt;build-dir&gt;/var/run/hello</i>.
+       This directory contains all files that will end up in the final
+       boot image.
+      </p>
+     </li>
+     <li>
+      <p>
+       It creates a configuration for the init component. The configuration
+       starts the hello component as the only child of init. Session
+       requests originating from the hello component will always be directed
+       towards the parent of init, which is core. The <tt>&lt;default&gt;</tt> node declares
+       that each component may consume up to 100 capabilities.
+      </p>
+     </li>
+     <li>
+      <p>
+       It assembles a boot image with the executable ELF binaries core,
+       ld.lib.so (the dynamic linker), init, and hello. The binaries are picked up
+       from the <i>&lt;build-dir&gt;/bin/</i> subdirectory.
+      </p>
+     </li>
+     <li>
+      <p>
+       It instructs Qemu (if used) to disable the graphical output.
+      </p>
+     </li>
+     <li>
+      <p>
+       It triggers the execution of the system scenario and watches the log
+       output for the given regular expression. The execution ends when
+       the log output appears or after a timeout of 10 seconds.
+      </p>
+     </li>
+    </ol>
+    <p>
+     The run script can be executed from within the build directory via the
+     command:
+    </p>
+<pre>
+ make run/hello
+</pre>
+    <p>
+     After the boot output of the used kernel, the scenario will produce the
+     following output:
+    </p>
+<pre>
+ [init -&gt; test-printf] Hello world
+
+ Run script execution successful.
+</pre>
+    <p>
+     The label within the brackets at the start of each line identifies the
+     component where the message originated from. The final line is printed by the
+     run tool after it successfully matched the log output against the regular
+     expression specified to the <tt>run_genode_until</tt> command.
+    </p>
+
+   </div>
+   <h3>
+   <a id="Responding_to_external_events"></a>
+   Responding to external events</h3>
+   <div class="subsection">
+    <p>
+     Most non-trivial components respond to external events such as user input,
+     timer events, device interrupts, the arrival of new data, or RPC requests
+     issued by other components.
+    </p>
+    <p>
+     The following example presents the typical skeleton of such a component.
+     The <tt>construct</tt> function merely creates an object representing the application
+     as a <tt>static</tt> local variable. The actual component code lives inside the
+     <tt>Main</tt> class.
+    </p>
+<pre>
+ #include &lt;base/component.h&gt;
+ #include &lt;base/log.h&gt;
+ #include &lt;timer_session/connection.h&gt;
+
+ namespace Hello { struct Main; }
+
+ struct Hello::Main
+ {
+   Genode::Env &_env;
+
+   Timer::Connection _timer { _env };
+
+   void _handle_timeout()
+   {
+     log("woke up at ", _timer.elapsed_ms(), " ms");
+   }
+
+   Genode::Signal_handler&lt;Main&gt; _timeout_handler {
+     _env.ep(), *this, &Main::_handle_timeout };
+
+   Main(Genode::Env &env) : _env(env)
+   {
+     _timer.sigh(_timeout_handler);
+     _timer.trigger_periodic(1000*1000);
+     Genode::log("component constructed");
+   }
+ };
+
+ void Component::construct(Genode::Env &env)
+ {
+   static Hello::Main main(env);
+ }
+</pre>
+    <p>
+     First, note the <tt>Hello</tt> namespace. As a good practice, component code
+     typically lives in a namespace. The component-specific namespace may
+     incorporate other namespaces - in particular the <tt>Genode</tt> namespace - without
+     polluting the global scope.
+    </p>
+    <p>
+     The constructor of the <tt>Main</tt> object takes the Genode environment as argument
+     and stores it as the reference member variable <tt>_env</tt>. The member variable is
+     prefixed with an underscore to highlight the fact that it is
+     private to the <tt>Main</tt> class. In principle, <tt>Main</tt> could be a <tt>class</tt> with <tt>_env</tt>
+     being part of the <tt>private</tt> section, but as <tt>Main</tt> is the top-level class of
+     the component that is not accessed by any other parts of the program, we use a
+     <tt>struct</tt> for brevity while still maintaining the convention to prefix private
+     members with an underscore character. When spotting the use of such a prefixed
+     variable in the code, we immediately see that it is part of the code's object
+     context, not being an argument or a local variable.
+    </p>
+    <p>
+     By aggregating a <tt>Timer::Connection</tt> as a member variable, the <tt>Main</tt> object
+     requests a session to a timer service at construction time. As this session
+     request requires an interaction with the outside world, the <tt>_env</tt> needs to
+     be passed to the <tt>_timer</tt> constructor.
+    </p>
+    <p>
+     In order to respond to events from the timer, the <tt>Main</tt> class hosts a
+     <tt>_timeout_handler</tt> object. Its constructor arguments refer to the object and
+     a method to be executed whenever an event occurs. The timeout handler object is
+     registered at the <tt>_timer</tt> as the recipient of timeout events via the <tt>sigh</tt>
+     method. Finally, the timer is instructed to trigger timeout events at a rate
+     of 1 second.
+    </p>
+    <p>
+     The following remarks are worth noting:
+    </p>
+    <ul>
+     <li>
+      <p>
+       The programming style expresses what the component <i>is</i> rather than what
+       the component <i>does</i>.
+      </p>
+     </li>
+     <li>
+      <p>
+       The component does not perform any dynamic memory allocation.
+      </p>
+     </li>
+     <li>
+      <p>
+       When called, the <tt>_handle_timeout</tt> method has its context (the <tt>Main</tt> object)
+       readily available, which makes the application of internal state changes as
+       response to external events very natural.
+      </p>
+     </li>
+     <li>
+      <p>
+       Both the <tt>construct</tt> function as well as the <tt>Main::_handle_timeout</tt> method
+       do not block for external events.
+      </p>
+     </li>
+     <li>
+      <p>
+       The component does not receive any indication about the number of occurred
+       events, just the fact that at least one event occurred. The
+       <tt>_handle_timeout</tt> code explicitly requests the current time from the
+       timer driver via the synchronous RPC call <tt>elapsed_ms</tt>.
+      </p>
+     </li>
+    </ul>
+    <p>
+     To execute the new version of the component, we need to slightly modify the
+     run script.
+    </p>
+<pre>
+build "core init drivers/timer app/hello"
+create_boot_directory
+install_config {
+ &lt;config&gt;
+   &lt;parent-provides&gt;
+     &lt;service name="LOG"/&gt;
+     &lt;service name="PD"/&gt;
+     &lt;service name="CPU"/&gt;
+     &lt;service name="ROM"/&gt;
+   &lt;/parent-provides&gt;
+   &lt;default-route&gt;
+     &lt;any-service&gt; &lt;parent/&gt; &lt;any-child/&gt; &lt;/any-service&gt;
+   &lt;/default-route&gt;
+   &lt;default caps="100"/&gt;
+   &lt;start name="timer"&gt;
+     &lt;resource name="RAM" quantum="1M"/&gt;
+     &lt;provides&gt; &lt;service name="Timer"/&gt; &lt;/provides&gt;
+   &lt;/start&gt;
+   &lt;start name="hello"&gt;
+     &lt;resource name="RAM" quantum="10M"/&gt;
+   &lt;/start&gt;
+ &lt;/config&gt;
+}
+build_boot_image "core ld.lib.so init timer hello"
+append qemu_args "-nographic -m 64"
+run_genode_until forever
+</pre>
+    <p>
+     The modifications are as follows:
+    </p>
+    <ul>
+     <li>
+      <p>
+       Since the hello component now relies on a timer service, we need to
+       build and integrate a timer driver into the scenario by extending
+       the <tt>build</tt> and <tt>build_boot_image</tt> steps accordingly.
+      </p>
+     </li>
+     <li>
+      <p>
+       We instruct init to spawn the timer driver as an additional component
+       by adding a <tt>&lt;start&gt;</tt> node to init's configuration. Within this node,
+       we declare that the component provides a service of type "Timer".
+      </p>
+     </li>
+     <li>
+      <p>
+       To enable the hello component to open a "Timer" session at the timer
+       driver, the default route is modified to consider any children as
+       servers whenever the requested service is not provided by the parent.
+      </p>
+     </li>
+     <li>
+      <p>
+       This time, we let the scenario run forever so that we can watch the
+       messages printed at periodic intervals.
+      </p>
+     </li>
+    </ul>
+    <p>
+     When starting the run script, we can observe the periodic activation
+     of the component in the log output:
+    </p>
+<pre>
+[init] child "timer" announces service "Timer"
+[init -&gt; hello] component constructed
+[init -&gt; hello] woke up at 12 ms
+[init -&gt; hello] woke up at 1008 ms
+[init -&gt; hello] woke up at 2005 ms
+...
+</pre>
+   </div>
+</body>
+</html>
