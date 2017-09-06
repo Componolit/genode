@@ -14,7 +14,7 @@
  #endif
 -    application.newMainWindow();
 +    auto *window = application.newMainWindow();
-+	window->setFixedWidth(540);
++	window->setFixedWidth(560); window->setFixedHeight(540);
      return application.exec();
  }
  
