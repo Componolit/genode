@@ -38,6 +38,7 @@ SRC_CC += arora_component.cc
 LIBS += libm libc_lwip libc_lwip_nic_dhcp
 
 RESOURCES += demo_html.qrc
+RESOURCES += foundations_html.qrc
 
 #
 # Prevent contrib code from causing warnings with our tool chain

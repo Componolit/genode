@@ -1,0 +1,919 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
+ "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head><title>Genode OS Framework Foundations</title></head>
+<body>
+ <h1>
+ <a id="System_configuration"></a>
+ System configuration</h1>
+  <p>
+   There are manifold principal approaches to configure different aspects of
+   an operating system and the applications running on top.
+   At the lowest level, there exists the opportunity to pass configuration
+   information to the boot loader. This information may be evaluated
+   directly by the boot loader or passed to the booted system. As an
+   example for the former, some boot loaders allow for setting up a
+   graphics mode depending on its configuration. Hence, the graphics mode
+   to be used by the OS could be defined right at this early stage
+   of booting. More prominently, however, is the mere passing of configuration
+   information to the booted OS, e.g., in the form of a kernel command line or as
+   command-line arguments to boot modules. The OS interprets
+   boot-loader-provided data structures (i.e., multiboot info structures) to
+   obtain such information. Most kernels interpret certain configuration
+   arguments passed via this mechanism.
+   At the OS-initialization level, before any drivers are functioning,
+   the OS behavior is typically governed by configuration information
+   provided along with the kernel image, i.e., an initial file-system
+   image (initrd). On Linux-based systems, this information comes in the
+   form of configuration files and init scripts located at well-known
+   locations within the initial file-system image.
+   Higher up the software stack, configuration becomes an even more diverse
+   topic. I.e., the runtime behavior of a GNU/Linux-based system is
+   defined by a conglomerate of configuration files, daemons and their
+   respective command-line arguments, environment variables, collections
+   of symlinks, and plenty of heuristics.
+  </p>
+  <p>
+   The diversity and complexity of configuration mechanisms, however, is
+   problematic for high-assurance computing. To attain a high level of
+   assurance, Genode's architecture must be complemented by a low-complexity
+   yet scalable configuration concept.
+   The design of this concept takes the following considerations into account:
+  </p>
+  <div><dl>
+   <dt>Uniformity across platforms</dt>
+   <dd>
+    <p>
+     To be applicable across a variety of kernels and hardware platforms, the
+     configuration mechanism must not rely on a particular kernel or boot loader.
+     Even though boot loaders for x86-based machines usually support the
+     multiboot specification and thereby the ability to supplement boot modules
+     with additional command lines, boot loaders on ARM-based platforms
+     generally lack this ability. Furthermore, even if a multiboot compliant
+     boot loader is used, the kernel - once started - must provide a way to
+     reflect the boot information to the system on top, which is not the case
+     for most microkernels.
+    </p>
+   </dd>
+   <dt>Low complexity</dt>
+   <dd>
+    <p>
+     The configuration mechanism is an intrinsic part of each component. Hence,
+     it affects the trusted computing base of every Genode-based system.
+     For this reason, the mechanism must be easy to understand and implementable
+     without the need for complex underlying OS infrastructure. As a negative
+     example, the provision of configuration files via a file system would
+     require each Genode-based system to support the notion of a file system
+     and to define the naming of configuration files.
+    </p>
+   </dd>
+   <dt>Expressiveness</dt>
+   <dd>
+    <p>
+     Passing configuration information as command-line arguments to components
+     at their creation time seems like a natural way to avoid the complexity
+     of a file-based configuration mechanism.
+     However, whereas command-line arguments are the tried and tested way for
+     supplying program arguments in a concise way, the expressiveness
+     of the approach is limited. In particular, it is ill-suited for expressing
+     structured information as often found in configurations.
+     Being a component-based system, Genode requires a way to
+     express relationships between components, which lends itself to the
+     use of a structural representation.
+    </p>
+   </dd>
+   <dt>Common syntax</dt>
+   <dd>
+    <p>
+     The requirement of a low-complexity mechanism mandates a common syntax
+     across components. Otherwise, each component would need to  come with a
+     custom parser. Each of those parsers would eventually inflate the
+     complexity of the trusted computing base. In contrast, a common syntax
+     that is both expressive and simple to parse helps to avoid such
+     redundancies by using a single parser implementation across all components.
+    </p>
+   </dd>
+   <dt>Least privilege</dt>
+   <dd>
+    <p>
+     Being the guiding motive behind Genode's architecture, the principle of
+     least privilege needs to be applied to the access of configuration
+     information. Each component needs to be able to access its own configuration
+     but must not observe configuration information concerning unrelated components.
+     A system-global registry of configurations or even a global namespace of
+     keys for such a database would violate this principle.
+    </p>
+   </dd>
+   <dt>Accommodation of dynamic workloads</dt>
+   <dd>
+    <p>
+     Supplying configuration information at the construction time of a component
+     is not sufficient for long-living components, whose behavior might need to
+     be adapted at runtime.
+     For example, the assignment of resources to the clients of a resource
+     multiplexer might change over the lifetime of the resource multiplexer.
+     Hence, the configuration concept should provide a means to update
+     the configuration information of a component after it has been constructed.
+    </p>
+   </dd>
+  </dl></div>
+  <h2>
+  <a id="Nested_configuration_concept"></a>
+  Nested configuration concept</h2>
+   <p>
+    Genode's configuration concept is based on the ROM session interface described
+    in Section <a href="components.html#Read-only_memory__ROM_">Read-only memory (ROM)</a>. In contrast to a file-system interface,
+    the ROM session interface is extremely simple. The client of a ROM service
+    specifies the requested ROM module by its name as known by the client.
+    There is neither a way to query a list of available ROM modules, nor are ROM
+    modules organized in a hierarchic name space.
+   </p>
+   <table class="captionedimage"><tr><td>
+     <a id="img_nested_config"></a>
+     <img src="img/nested_config.png" alt="img/nested_config" />
+   </td></tr><tr><td>
+     <div class="caption"> Nested system configuration</div>
+   </td></tr></table>
+   <p>
+    The ROM session interface is implemented by core's ROM service to make boot
+    modules available to other components. Those boot modules comprise the
+    executable binaries of the init component as well as those of the components
+    created by init. Furthermore, a ROM module called "config" contains the
+    configuration of the init process in XML format. To obtain its
+    configuration, init requests a ROM session for the ROM module "config" from
+    its parent, which is core. Figure <a href="#img_nested_config">img/nested_config</a> shows an example of
+    such a config ROM module.
+   </p>
+   <table class="captionedimage"><tr><td>
+     <a id="img_config_virtualization"></a>
+     <img src="img/config_virtualization.png" alt="img/config_virtualization" />
+   </td></tr><tr><td>
+     <div class="caption"> Successive interception of "config" ROM requests</div>
+   </td></tr></table>
+   <p>
+    The config ROM module uses XML as syntax, which supports the expression of
+    arbitrary structural data while being simple to parse. I.e., Genode's XML
+    parser comes in the form of a single header file with less than 400 lines of
+    code. Init's configuration is contained within a single <tt>&lt;config&gt;</tt> node.
+   </p>
+   <p>
+    Each component started by init obtains its configuration by requesting
+    a ROM module named "config" from its parent. Init responds to
+    this request by handing out a locally-provided ROM session. Instead of
+    handing out the "config" ROM module as obtained from core, it creates a new
+    dataspace that solely contains the portion of init's config ROM module that
+    refers to the respective child. Analogously to init's configuration,
+    each child's configuration has the form of a single <tt>&lt;config&gt;</tt> node.
+    This works recursively. From each component's perspective, including the init
+    component, the mechanism for obtaining its configuration is identical &ndash; it
+    obtains a ROM session for a ROM module named "config" from its parent.
+    The parent interposes the ROM session request as described in
+    Section <a href="components.html#Interposing_individual_services">Interposing individual services</a>. Figure <a href="#img_config_virtualization">img/config_virtualization</a>
+    shows the successive interposing of "config" ROM requests according to the
+    example configuration given in Figure <a href="#img_nested_config">img/nested_config</a>.
+    At each level, the information structure within the <tt>&lt;config&gt;</tt> node can
+    be different. Besides following the convention that a configuration has the
+    form of a single <tt>&lt;config&gt;</tt> node, each component can introduce arbitrary
+    custom tags and attributes.
+   </p>
+   <p>
+    Besides being simple, the use of the ROM session interface for supplying
+    configuration information has the benefit of supporting dynamic configuration
+    updates over the lifetime of the config ROM session. Section
+    <a href="components.html#Read-only_memory__ROM_">Read-only memory (ROM)</a> describes the update protocol between client
+    and server of a ROM session. This way, the configuration of long-living
+    components can be dynamically changed.
+   </p>
+  <h2>
+  <a id="The_init_component"></a>
+  The init component</h2>
+   <p>
+    The init component plays a special role within Genode's component tree. It
+    gets started directly by core, gets assigned all physical resources, and
+    controls the execution of all subsequent component nodes, which can be further
+    instances of init. Init's policy is driven by an XML-based configuration,
+    which declares a number of children, their relationships, and resource
+    assignments.
+   </p>
+   <h3>
+   <a id="Session_routing"></a>
+   Session routing</h3>
+   <div class="subsection">
+    <p>
+     At the parent-child interface, there are two operations that are subject to
+     policy decisions of the parent: the child announcing a service and the
+     child requesting a service. If a child announces a service, it is up to the parent
+     to decide if and how to make this service accessible to its other children.
+     When a child requests a service, the parent may deny the session request,
+     delegate the request to its own parent, implement the requested service
+     locally, or open a session at one of its other children. This decision may
+     depend on the service requested or the session-construction arguments provided
+     by the child. Apart from assigning resources to children, the central
+     element of the policy implemented in the parent is a set of rules to
+     route session requests. Therefore, init's configuration concept is laid out
+     around child components and the routing of session requests originating from
+     those components. The mechanism is best illustrated by an example:
+    </p>
+<pre>
+ &lt;config&gt;
+   &lt;parent-provides&gt;
+     &lt;service name="PD"/&gt;
+     &lt;service name="ROM"/&gt;
+     &lt;service name="CPU"/&gt;
+     &lt;service name="LOG"/&gt;
+   &lt;/parent-provides&gt;
+   &lt;start name="timer" caps="100"&gt;
+     &lt;resource name="RAM" quantum="1M"/&gt;
+     &lt;provides&gt; &lt;service name="Timer"/&gt; &lt;/provides&gt;
+     &lt;route&gt;
+       &lt;service name="PD"&gt;  &lt;parent/&gt; &lt;/service&gt;
+       &lt;service name="ROM"&gt; &lt;parent/&gt; &lt;/service&gt;
+       &lt;service name="CPU"&gt; &lt;parent/&gt; &lt;/service&gt;
+       &lt;service name="LOG"&gt; &lt;parent/&gt; &lt;/service&gt;
+     &lt;/route&gt;
+   &lt;/start&gt;
+   &lt;start name="test-timer" caps="200"&gt;
+     &lt;resource name="RAM" quantum="1M"/&gt;
+     &lt;route&gt;
+       &lt;service name="Timer"&gt;  &lt;child name="timer"/&gt; &lt;/service&gt;
+       &lt;service name="PD"&gt;     &lt;parent/&gt;             &lt;/service&gt;
+       &lt;service name="ROM"&gt;    &lt;parent/&gt;             &lt;/service&gt;
+       &lt;service name="CPU"&gt;    &lt;parent/&gt;             &lt;/service&gt;
+       &lt;service name="LOG"&gt;    &lt;parent/&gt;             &lt;/service&gt;
+     &lt;/route&gt;
+   &lt;/start&gt;
+ &lt;/config&gt;
+</pre>
+    <p>
+     First, there is the declaration of services provided by the parent of the
+     configured init instance. In this case, we declare that the parent provides a
+     a LOG service.
+     For each child to start, there is a <tt>&lt;start&gt;</tt> node describing the assigned RAM
+     and capability budget, declaring services provided by the child,
+     and holding a routing table for session requests originating from the child.
+     The first child is called "timer" and implements the "Timer" service.
+     The second component called "test-timer" is a client of the timer service. In
+     its routing table, we see that requests for "Timer" sessions are routed to the
+     "timer" child whereas requests for core's services are routed to
+     init's parent. Per-child service routing rules provide a flexible way to
+     express arbitrary client-server relationships. For example, service requests
+     may be transparently mediated through special policy components acting upon
+     session-construction arguments. There might be multiple children implementing
+     the same service, each targeted by different routing tables. If there exists no
+     valid route to a requested service, the service is denied. In the example
+     above, the routing tables act effectively as a white list of services the child
+     is allowed to use.
+    </p>
+    <h4>
+    <a id="Routing_based_on_session_labels"></a>
+    Routing based on session labels</h4>
+     <p>
+      Access-control policies in Genode systems are based on session labels. When a
+      server receives a new session request, the session label is passed along with
+      the request.
+     </p>
+     <p>
+      A session label is a string that is assembled by the components that are
+      involved with routing the session request from the client along the branches
+      of the component tree to the server. The client may specify the least
+      significant part of the label by itself. This part gives the parent a hint
+      for routing the request. For example, a client may create two file-system
+      sessions, one labeled with "home" and one labeled with "bin". The parent may
+      take this information into account and route the individual requests to
+      different file-system servers. The label is successively superseded (prefixed)
+      by additional parts along the chain of components on the route of the session
+      request. The first part of the label is the most significant part as it is
+      imposed by the component in the intermediate proximity of the server. The last
+      part is the least trusted part of the label because it originated from the
+      client. Once the session request arrives at the server, the server takes the
+      session label as the key to select a server-side policy as described in
+      Section <a href="components.html#Server-side_policy_selection">Server-side policy selection</a>.
+     </p>
+     <p>
+      In most cases, routing decisions are simply based on the type of the requested
+      sessions. However, by equipping <tt>&lt;service&gt;</tt> nodes with the following
+      attributes, it is possible to take session labels as a criterion for the
+      routing of session requests into account.
+     </p>
+     <div><dl>
+      <dt><tt>label="&lt;string&gt;"</tt></dt>
+      <dd>
+       <p>
+        The session label must perfectly match the specified
+        string.
+       </p>
+      </dd>
+      <dt><tt>label_prefix="&lt;string&gt;"</tt></dt>
+      <dd>
+       <p>
+        The first part of the label must match the
+        specified string.
+       </p>
+      </dd>
+      <dt><tt>label_suffix="&lt;string&gt;"</tt></dt>
+      <dd>
+       <p>
+        The last part of the label must match the
+        specified string.
+       </p>
+      </dd>
+      <dt><tt>unscoped_label="&lt;string&gt;"</tt></dt>
+      <dd>
+       <p>
+        The session label including the child's name
+        prefix must perfectly match the specified string. In contrast to the
+        <tt>label</tt> attribute, which refers to the child-defined label, the <tt>unscoped_label</tt>
+        can refer to the child's environment sessions, which have no client-defined
+        label because they are initiated by init itself.
+       </p>
+      </dd>
+     </dl></div>
+     <p>
+      If no attributes are present, the route matches. The attributes can be
+      combined. If any of the specified attributes mismatch, the route is
+      neglected.
+      If multiple <tt>&lt;service&gt;</tt> nodes match in init's routing configuration, the first
+      matching rule is taken. So the order of the nodes is important.
+     </p>
+    <h4>
+    <a id="Wildcards"></a>
+    Wildcards</h4>
+     <p>
+      In practice, usage scenarios become more complex than the basic example,
+      increasing the size of routing tables. Furthermore, in many practical cases,
+      multiple children may use the same set of services and require duplicated
+      routing tables within the configuration. In particular during development, the
+      elaborative specification of routing tables tend to become an inconvenience.
+      To alleviate this problem, there are two mechanisms, namely wildcards and a
+      default route.
+      Instead of specifying a list of individual service routes targeting the same
+      destination, the wildcard <tt>&lt;any-service&gt;</tt> becomes handy. For example, instead
+      of specifying
+     </p>
+<pre>
+ &lt;route&gt;
+   &lt;service name="ROM"&gt; &lt;parent/&gt; &lt;/service&gt;
+   &lt;service name="LOG"&gt; &lt;parent/&gt; &lt;/service&gt;
+   &lt;service name="PD"&gt;  &lt;parent/&gt; &lt;/service&gt;
+   &lt;service name="CPU"&gt; &lt;parent/&gt; &lt;/service&gt;
+ &lt;/route&gt;
+</pre>
+     <p>
+      the following shortform can be used:
+     </p>
+<pre>
+ &lt;route&gt;
+   &lt;any-service&gt; &lt;parent/&gt; &lt;/any-service&gt;
+ &lt;/route&gt;
+</pre>
+     <p>
+      The latter version is not as strict as the first one because it permits the
+      child to create sessions at the parent, which were not white listed in the
+      elaborative version. Therefore, the use of wildcards is discouraged for
+      configuring untrusted components. Wildcards and explicit routes may be combined
+      as illustrated by the following example:
+     </p>
+<pre>
+ &lt;route&gt;
+   &lt;service name="LOG"&gt; &lt;child name="nitlog"/&gt; &lt;/service&gt;
+   &lt;any-service&gt;        &lt;parent/&gt;              &lt;/any-service&gt;
+ &lt;/route&gt;
+</pre>
+     <p>
+      The routing table is processed starting with the first entry. If the route
+      matches the service request, it is taken, otherwise the remaining
+      routing-table entries are visited. This way, the explicit service route of
+      "LOG" sessions to the "nitlog" child shadows the LOG service provided by the
+      parent.
+     </p>
+     <p>
+      To allow a child to use services provided by arbitrary other children, there
+      is a further wildcard called <tt>&lt;any-child&gt;</tt>. Using this wildcard, such a policy
+      can be expressed as follows:
+     </p>
+<pre>
+ &lt;route&gt;
+   &lt;any-service&gt; &lt;parent/&gt;    &lt;/any-service&gt;
+   &lt;any-service&gt; &lt;any-child/&gt; &lt;/any-service&gt;
+ &lt;/route&gt;
+</pre>
+     <p>
+      This rule would delegate all session requests referring to one of the parent's
+      services to the parent. If no parent service matches the session request, the
+      request is routed to any child providing the service. The rule can be further
+      abbreviated to:
+     </p>
+<pre>
+ &lt;route&gt;
+   &lt;any-service&gt; &lt;parent/&gt; &lt;any-child/&gt; &lt;/any-service&gt;
+ &lt;/route&gt;
+</pre>
+     <p>
+      Init detects potential ambiguities caused by multiple children providing the
+      same service. In this case, the ambiguity must be resolved using an explicit
+      route preceding the wildcards.
+     </p>
+    <h4>
+    <a id="Default_routing"></a>
+    Default routing</h4>
+     <p>
+      To reduce the need to specify the same routing table for many children
+      in one configuration, there is a <tt>&lt;default-route&gt;</tt> mechanism. The default
+      route is declared within the <tt>&lt;config&gt;</tt> node and used for each <tt>&lt;start&gt;</tt>
+      entry with no <tt>&lt;route&gt;</tt> node. In particular during development, the default
+      route becomes handy to keep the configuration tidy and neat.
+     </p>
+     <p>
+      The combination of explicit routes and wildcards is designed to scale well from
+      being convenient to use during development towards being highly secure at
+      deployment time. If only explicit rules are present in the configuration, the
+      permitted relationships between all processes are explicitly defined and can be
+      easily verified.
+     </p>
+   </div>
+   <h3>
+   <a id="Resource_assignment"></a>
+   Resource assignment</h3>
+   <div class="subsection">
+    <h4>
+    <a id="Physical_memory_budget"></a>
+    Physical memory budget</h4>
+     <p>
+      Each <tt>&lt;start&gt;</tt> node must be equipped with a declaration of the amount of
+      RAM assigned to the child via a <tt>&lt;resource&gt;</tt> sub node.
+     </p>
+<pre>
+ &lt;resource name="RAM" quantum="1M"/&gt;
+</pre>
+     <p>
+      If the specified amount exceeds the available resources,
+      the available resources are assigned almost completely to the child.
+      This makes it possible to assign all remaining resources to the last child by
+      simply specifying an overly large quantum.
+      In this case, init retains only a small amount of quota for itself, which is used to cover
+      indirect costs such as a few capabilities created on behalf of the children,
+      or memory used for buffering configuration data. The preserved amount
+      can be configured as follows:
+     </p>
+<pre>
+ &lt;config&gt;
+   ...
+   &lt;resource name="RAM" preserve="1M"/&gt;
+   ...
+ &lt;/config&gt;
+</pre>
+     <p>
+      If not specified, init has a reasonable default of 160K (on 32 bit) and
+      320K (on 64 bit).
+     </p>
+    <h4>
+    <a id="Capability_budget"></a>
+    Capability budget</h4>
+     <p>
+      Each component requires a certain amount of capabilities to live. At startup,
+      several capabilities are created along with the component's environment
+      sessions, in particular its PD session. At lifetime, the component consumes
+      capabilities when creating signal handlers or RPC objects. Since the
+      system-global amount of capabilities is a bounded resource, which depends on
+      the used kernel and the kernel configuration, Genode subjects the allocation
+      of capabilities to the same rigid regime as for physical memory. First, the
+      creation of capabilities is restricted by resource quotas explicitly assigned
+      to components. Second, capability budgets can be traded between clients and
+      servers such that servers are able to account capability allocations to their
+      clients.
+     </p>
+     <p>
+      Each <tt>&lt;start&gt;</tt> node can be equipped with a <tt>caps</tt> attribute with
+      the amount of capabilities assigned to the component. As a rule of
+      thumb, the setup costs of a component are 35 capabilities. Hence, for
+      typical components, an amount of 100 is a practical value.
+      To alleviate the need to equip each <tt>&lt;start&gt;</tt> node with the same default
+      value, the init configuration accepts a default declaration as follows:
+     </p>
+<pre>
+ &lt;default caps="100"/&gt;
+</pre>
+     <p>
+      Unless a <tt>&lt;start&gt;</tt> node is equipped with a custom <tt>caps</tt> attribute, the
+      default value is used.
+     </p>
+     <p>
+      If a component runs out of capabilities, core's PD service prints a warning to
+      the log. To observe the consumption of capabilities per component in detail,
+      core's PD service is equipped with a diagnostic mode, which can be enabled via
+      the <tt>diag</tt> attribute in the target node of init's routing rules. E.g., the
+      following route enables the diagnostic mode for the PD session:
+     </p>
+<pre>
+ &lt;route&gt;
+   &lt;service name="PD"&gt; &lt;parent diag="yes"/&gt; &lt;/service&gt;
+   ...
+ &lt;/route&gt;
+</pre>
+     <p>
+      With the <tt>diag</tt> attribute enabled, core prints a log message each time the
+      PD consumes, frees, or transfers its capability budget.
+     </p>
+   </div>
+   <h3>
+   <a id="Multiple_instantiation_of_a_single_ELF_binary"></a>
+   Multiple instantiation of a single ELF binary</h3>
+   <div class="subsection">
+    <p>
+     Each <tt>&lt;start&gt;</tt> node requires a unique <tt>name</tt> attribute. By default, the
+     value of this attribute is used as ROM module name for obtaining the ELF
+     binary from the parent. If multiple instances of a component with the same
+     ELF binary are needed, the binary name can be explicitly specified
+     using a <tt>&lt;binary&gt;</tt> sub node of the <tt>&lt;start&gt;</tt> node:
+    </p>
+<pre>
+ &lt;binary name="filename"/&gt;
+</pre>
+    <p>
+     This way, a unique child name can be defined independently from the
+     binary name.
+    </p>
+   </div>
+   <h3>
+   <a id="Session-label_rewriting"></a>
+   Session-label rewriting</h3>
+   <div class="subsection">
+    <p>
+     As explained in section <a href="#Session_routing">Session routing</a>, init routes session requests by
+     taking the requested service type and the
+     session label into account. The latter may be used by the server as a key for
+     selecting a policy at the server side. To simplify server-side policies, init
+     supports the rewriting of session labels in the target node
+     of a matching session route. For example, a interactive shell ("noux") may
+     have the following session route for the "home" file system:
+    </p>
+<pre>
+&lt;route&gt;
+  &lt;service name="File_system" label="home"&gt;
+    &lt;child name="vfs"/&gt;
+  &lt;/service&gt;
+  ...
+&lt;/route&gt;
+</pre>
+    <p>
+     At the "vfs" file-system server, the label of the file-system session will
+     appear as "noux -&gt; home". This information may be evaluated by the vfs's
+     server-side policy. However, when renaming the noux instance, we'd need to
+     update this server-side policy.
+    </p>
+    <p>
+     With the label-rewriting mechanism, the client's identity can be hidden from
+     the server. The label can instead represent the role of the client, or a name
+     of a physical resource. For example, the route could be changed to this:
+    </p>
+<pre>
+&lt;route&gt;
+  &lt;service name="File_system" label="home"&gt;
+    &lt;child name="vfs" label="primary_user"/&gt;
+  &lt;/service&gt;
+  ...
+&lt;/route&gt;
+</pre>
+    <p>
+     When the vfs receives the session request, it is presented with the label
+     "primary_user". The fact that the client is "noux" is not taken into account
+     for the server-side policy selection.
+    </p>
+   </div>
+   <h3>
+   <a id="Nested_configuration"></a>
+   Nested configuration</h3>
+   <div class="subsection">
+    <p>
+     Each <tt>&lt;start&gt;</tt> node can host a <tt>&lt;config&gt;</tt> sub node.
+     As described in Section <a href="#Nested_configuration_concept">Nested configuration concept</a>, the content of this
+     sub node is provided to the child when a ROM session for the module name
+     "config" is requested.
+     Thereby, arbitrary configuration parameters can be passed to the
+     child. For example, the following configuration starts the <tt>timer-test</tt> within an
+     init instance within another init instance. To show the flexibility of init's
+     service routing facility, the "Timer" session of the second-level <tt>timer-test</tt>
+     child is routed to the timer service started at the first-level init instance.
+    </p>
+<pre>
+ &lt;config&gt;
+   &lt;parent-provides&gt;
+     &lt;service name="LOG"/&gt;
+     &lt;service name="ROM"/&gt;
+     &lt;service name="CPU"/&gt;
+     &lt;service name="PD"/&gt;
+   &lt;/parent-provides&gt;
+   &lt;start name="timer" caps="100"&gt;
+     &lt;resource name="RAM" quantum="1M"/&gt;
+     &lt;provides&gt;&lt;service name="Timer"/&gt;&lt;/provides&gt;
+     &lt;route&gt;
+       &lt;any-service&gt; &lt;parent/&gt; &lt;/any-service&gt;
+     &lt;/route&gt;
+   &lt;/start&gt;
+   &lt;start name="init" caps="1000"&gt;
+     &lt;resource name="RAM" quantum="10M"/&gt;
+     &lt;config&gt;
+       &lt;parent-provides&gt;
+         &lt;service name="Timer"/&gt;
+         &lt;service name="LOG"/&gt;
+         &lt;service name="ROM"/&gt;
+         &lt;service name="CPU"/&gt;
+         &lt;service name="PD"/&gt;
+       &lt;/parent-provides&gt;
+       &lt;start name="test-timer" caps="200"&gt;
+         &lt;resource name="RAM" quantum="1M"/&gt;
+         &lt;route&gt;
+           &lt;any-service&gt; &lt;parent/&gt; &lt;/any-service&gt;
+         &lt;/route&gt;
+       &lt;/start&gt;
+     &lt;/config&gt;
+     &lt;route&gt;
+       &lt;service name="Timer"&gt; &lt;child name="timer"/&gt; &lt;/service&gt;
+       &lt;any-service&gt;          &lt;parent/&gt;             &lt;/any-service&gt;
+     &lt;/route&gt;
+   &lt;/start&gt;
+ &lt;/config&gt;
+</pre>
+    <p>
+     The services ROM, LOG, CPU, and PD are required by the second-level
+     init instance to create the timer-test component.
+     As illustrated by this example, the use of nested configurations
+     enables the construction of arbitrarily complex component trees via a single
+     configuration.
+    </p>
+   </div>
+   <h3>
+   <a id="Configuring_components_from_distinct_ROM_modules"></a>
+   Configuring components from distinct ROM modules</h3>
+   <div class="subsection">
+    <p>
+     As an alternative to specifying the component configurations of all <tt>&lt;start&gt;</tt>
+     nodes via <tt>&lt;config&gt;</tt> sub nodes, component configurations may be placed in
+     separate ROM modules by facilitating the session-label rewriting mechanism
+     described in Section <a href="#Session-label_rewriting">Session-label rewriting</a>:
+    </p>
+<pre>
+ &lt;start name="nitpicker"&gt;
+   &lt;resource name="RAM" quantum="1M"/&gt;
+   &lt;route&gt;
+     &lt;service name="ROM" label="config"&gt;
+       &lt;parent label="nitpicker.config"/&gt;
+     &lt;/service&gt;
+     ...
+   &lt;/route&gt;
+   ...
+ &lt;/start&gt;
+</pre>
+    <p>
+     With this routing rule in place, a ROM session request for the module "config"
+     is routed to the parent and appears at the parent's ROM service under the
+     label "nitpicker.config".
+    </p>
+   </div>
+   <h3>
+   <a id="Assigning_subsystems_to_CPUs"></a>
+   Assigning subsystems to CPUs</h3>
+   <div class="subsection">
+    <p>
+     Most multi-processor (MP) systems have topologies that can be represented on a
+     two-dimensional coordinate system. CPU nodes
+     close to each other are expected to have closer relationship than distant
+     nodes. In a large MP system, it is natural to assign clusters of closely
+     related nodes to a given workload. As described in Section
+     <a href="architecture.html#Recursive_system_structure">Recursive system structure</a>, Genode's architecture is based on a strictly
+     hierarchic organizational structure. Thereby, it lends itself to the idea of
+     applying this successive virtualization of resources to the problem of clustering
+     CPU nodes.
+    </p>
+    <table class="captionedimage"><tr><td>
+      <a id="img_affinity_spaces"></a>
+      <img src="img/affinity_spaces.png" alt="img/affinity_spaces" />
+    </td></tr><tr><td>
+      <div class="caption"> Successive virtualization of CPU affinity spaces by nested instances of init</div>
+    </td></tr></table>
+    <p>
+     Each component within the component tree has a component-local view on a
+     so-called <i>affinity space</i>, which is a two-dimensional coordinate space. If the
+     component creates a new subsystem, it can assign a portion of its own affinity
+     space to the new subsystem by imposing a rectangular affinity location to the
+     subsystem's CPU session. Figure <a href="#img_affinity_spaces">img/affinity_spaces</a> illustrates the idea.
+    </p>
+    <p>
+     Following from the expression of affinities as a rectangular location within a
+     component-local affinity space, the assignment of subsystems to CPU nodes
+     consists of two parts: the definition of the affinity space dimensions as used
+     for the init instance, and the association of subsystems with affinity locations
+     relative to the affinity space.
+     The affinity space is configured as a sub node of the <tt>&lt;config&gt;</tt> node. For
+     example, the following declaration describes an affinity space of 4x2:
+    </p>
+<pre>
+ &lt;config&gt;
+   ...
+   &lt;affinity-space width="4" height="2" /&gt;
+   ...
+ &lt;/config&gt;
+</pre>
+    <p>
+     Subsystems can be constrained to parts of the affinity space using the
+     <tt>&lt;affinity&gt;</tt> sub node of a <tt>&lt;start&gt;</tt> entry:
+    </p>
+<pre>
+ &lt;config&gt;
+   ...
+   &lt;start name="loader"&gt;
+     &lt;affinity xpos="0" ypos="1" width="2" height="1" /&gt;
+     ...
+   &lt;/start&gt;
+   ...
+ &lt;/config&gt;
+</pre>
+    <p>
+     As illustrated by this example, the numbers used in the declarations for this
+     instance of init are not directly related to physical CPUs.
+     If the machine has merely two cores, init's affinity space would be mapped to
+     the range 0,1 of physical CPUs. However, in a machine with 16x16 CPUs, the
+     loader would obtain 8x8 CPUs with the upper-left CPU at position (4,0).
+    </p>
+   </div>
+   <h3>
+   <a id="Priority_support"></a>
+   Priority support</h3>
+   <div class="subsection">
+    <p>
+     The number of CPU priorities to be distinguished by init can be specified with
+     the <tt>prio_levels</tt> attribute of the <tt>&lt;config&gt;</tt> node. The value must be a power of
+     two. By default, no priorities are used. To assign a priority to a child
+     process, a priority value can be specified as <tt>priority</tt> attribute of the
+     corresponding <tt>&lt;start&gt;</tt> node. Valid priority values lie in the range of
+    </p>
+    <p>
+     -prio_levels + 1 (maximum priority degradation) to 0 (no priority degradation).
+    </p>
+   </div>
+   <h3>
+   <a id="Propagation_of_exit_events"></a>
+   Propagation of exit events</h3>
+   <div class="subsection">
+    <p>
+     A component can notify its parent about its graceful exit via the exit RPC
+     function of the parent interface. By default, init responds to such a
+     notification from one of its children by merely printing a log message but
+     ignores it otherwise. However, there are scenarios where the exit of a
+     particular child should result in the exit of the entire init component. To
+     propagate the exit of a child to the parent of init, start nodes can host the
+     optional sub node <tt>&lt;exit&gt;</tt> with the attribute <tt>propagate</tt> set to "yes".
+    </p>
+<pre>
+ &lt;config&gt;
+   &lt;start name="noux"&gt;
+     &lt;exit propagate="yes"/&gt;
+     ...
+   &lt;/start&gt;
+ &lt;/config&gt;
+</pre>
+    <p>
+     The exit value specified by the exiting child is forwarded to init's parent.
+    </p>
+   </div>
+   <h3>
+   <a id="State_reporting"></a>
+   State reporting</h3>
+   <div class="subsection">
+    <p>
+     When used in a nested fashion, init can be configured to report its internal
+     state in the form of a "state" report by placing a <tt>&lt;report&gt;</tt> node into init's
+     configuration. The report node accepts the following arguments (with their
+     default values shown):
+    </p>
+    <div><dl>
+     <dt><tt>delay_ms="100"</tt></dt>
+     <dd>
+      <p>
+       specifies the number of milliseconds to wait before
+       producing a new report. This way, many consecutive state changes -
+       like they occur during startup - do not result in an overly
+       large number of reports but are merged into one final report.
+      </p>
+     </dd>
+     <dt><tt>buffer="4K"</tt></dt>
+     <dd>
+      <p>
+       the maximum size of the report in bytes. The attribute
+       accepts the use of K/M/G as units.
+      </p>
+     </dd>
+     <dt><tt>init_ram="no"</tt></dt>
+     <dd>
+      <p>
+       if enabled, the report will contain a <tt>&lt;ram&gt;</tt> node
+       with the memory statistics of init.
+      </p>
+     </dd>
+     <dt><tt>init_caps="no"</tt></dt>
+     <dd>
+      <p>
+       if enabled, the report will contain a <tt>&lt;caps&gt;</tt> node
+       with the capability-allocation statistics of init.
+      </p>
+     </dd>
+     <dt><tt>ids="no"</tt></dt>
+     <dd>
+      <p>
+       supplement the children in the report with unique IDs, which
+       may be used to infer the lifetime of children across configuration
+       updates in the future.
+      </p>
+     </dd>
+     <dt><tt>requested="no"</tt></dt>
+     <dd>
+      <p>
+       if enabled, the report will contain information about
+       all session requests initiated by the children.
+      </p>
+     </dd>
+     <dt><tt>provided="no"</tt></dt>
+     <dd>
+      <p>
+       if enabled, the report will contain information about
+       all sessions provided by all servers.
+      </p>
+     </dd>
+     <dt><tt>session_args="no"</tt></dt>
+     <dd>
+      <p>
+       level of detail of the session information
+       generated via <tt>requested</tt> or <tt>provided</tt>.
+      </p>
+     </dd>
+     <dt><tt>child_ram="no"</tt></dt>
+     <dd>
+      <p>
+       if enabled, the report will contain a <tt>&lt;ram&gt;</tt> node
+       for each child based on the information obtained from the child's PD
+       session.
+      </p>
+     </dd>
+     <dt><tt>child_caps="no"</tt></dt>
+     <dd>
+      <p>
+       if enabled, the report will contain a <tt>&lt;caps&gt;</tt> node
+       for each child based on the information obtained from the child's PD
+       session.
+      </p>
+     </dd>
+    </dl></div>
+    <p>
+     Note that the state reporting feature cannot be used for the initial
+     instance of init started by core. It depends on the "Timer" and "Report"
+     services, which are provided by higher-level components only.
+    </p>
+   </div>
+   <h3>
+   <a id="Init_verbosity"></a>
+   Init verbosity</h3>
+   <div class="subsection">
+    <p>
+     To ease debugging, init can be instructed to print diverse status
+     information as LOG output. To enable the verbose mode, assign the value "yes"
+     to the <tt>verbose</tt> attribute of the <tt>&lt;config&gt;</tt> node.
+    </p>
+   </div>
+   <h3>
+   <a id="Service_forwarding"></a>
+   Service forwarding</h3>
+   <div class="subsection">
+    <p>
+     In nested scenarios, init is able to act as a server that forwards
+     session requests to its children. Session requests can be routed
+     depending on the requested service type and the session label
+     originating from init's parent.
+    </p>
+    <p>
+     The feature is configured by one or multiple <tt>&lt;service&gt;</tt> nodes hosted in
+     init's <tt>&lt;config&gt;</tt> node. The routing policy is selected via the regular
+     server-side policy-selection mechanism, for example:
+    </p>
+<pre>
+ &lt;config&gt;
+   ...
+   &lt;service name="LOG"&gt;
+     &lt;policy label="noux"&gt;
+       &lt;child name="terminal_log" label="important"/&gt;
+     &lt;/policy&gt;
+     &lt;default-policy&gt; &lt;child name="nitlog"/&gt; &lt;/default-policy&gt;
+   &lt;/service&gt;
+   ...
+ &lt;/config&gt;
+</pre>
+    <p>
+     Each policy node must have a <tt>&lt;child&gt;</tt> sub node, which denotes the name of the
+     server with the <tt>name</tt> attribute. The optional <tt>label</tt> attribute defines
+     the session label presented to the server, analogous to how the
+     rewriting of session labels works in session routes. If not specified,
+     the client-provided label is presented to the server as is.
+    </p>
+   </div>
+</body>
+</html>

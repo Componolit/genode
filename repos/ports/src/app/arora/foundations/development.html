@@ -1,0 +1,1359 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
+ "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head><title>Genode OS Framework Foundations</title></head>
+<body>
+ <h1>
+ <a id="Development"></a>
+ Development</h1>
+  <p>
+   The Genode OS framework is accompanied by a scalable build system and tooling
+   infrastructure that is designed for the creation of highly modular and
+   portable systems software.
+   Understanding the underlying concepts is important for leveraging the full
+   potential of the framework.
+   This chapter complements Chapter <a href="getting_started.html#Getting_started">Getting started</a> with the explanation of the
+   coarse-grained source-tree structure (Section <a href="#Source-code_repositories">Source-code repositories</a>),
+   the integration
+   of 3rd-party software (Section <a href="#Integration_of_3rd-party_software">Integration of 3rd-party software</a>),
+   the build system (Section <a href="#Build_system">Build system</a>), and system-integration tools
+   (Section <a href="#System_integration_and_automated_testing">System integration and automated testing</a>).
+   Furthermore, it describes the project's development process in Section
+   <a href="#Git_flow">Git flow</a>.
+  </p>
+  <h2>
+  <a id="Source-code_repositories"></a>
+  Source-code repositories</h2>
+   <p>
+    As briefly introduced in Section <a href="getting_started.html#Source-tree_structure">Source-tree structure</a>, Genode's source tree
+    is organized in the form of several source-code repositories. This
+    coarse-grained modularization of the source code has the following benefits:
+   </p>
+   <ul>
+    <li>
+     <p>
+      Source codes of different concerns remain well separated.
+      For example, the platform-specific code for each base
+      platform is located in a dedicated <i>base-&lt;platform&gt;</i> repository.
+     </p>
+    </li>
+    <li>
+     <p>
+      Different abstraction levels and features of the system can be maintained
+      in different source-code repositories.
+      Whereby the source code contained in the <i>os</i> repository is free from any
+      dependency from 3rd-party software, the components hosted in the <i>libports</i>
+      repository are free to use foreign code.
+     </p>
+    </li>
+    <li>
+     <p>
+      Custom developments and experimental features can be hosted in dedicated
+      source-code repositories, which do not interfere with Genode's source
+      tree. Such a custom repository can be managed independently from Genode
+      using arbitrary revision-control systems.
+     </p>
+    </li>
+   </ul>
+   <p>
+    The build-directory configuration defines the set of repositories to
+    incorporate into the build process. At build time, the build system overlays
+    the directory structures of all selected repositories
+    to form a single logical source tree. The selection of source-code
+    repositories ultimately defines the view of the build system on the source
+    tree.
+   </p>
+   <p>
+    Note that the order of the repositories as configured in the build
+    configuration (in <i>etc/build.conf</i>) is important. Front-most repositories
+    shadow subsequent repositories.
+    This makes the repository mechanism a powerful tool for tweaking
+    existing repositories: By adding a custom repository in front of another one,
+    customized versions of single files (e.g., header files or target description
+    files) can be supplied to the build system without changing the original
+    repository.
+   </p>
+   <p>
+    Each source-code repository has the principle structure shown in Table
+    <a href="#repository_overview">1</a>.
+   </p>
+   <p>
+   <a id="repository_overview"></a>
+   </p>
+   <table class="gosh_table">
+   <tr>
+    <th>  Directory</th>
+    <th> Description</th>
+   </tr><tr>
+    <td>  <i>doc/</i></td>
+    <td> Documentation, specific for the repository</td>
+   </tr><tr>
+    <td>  <i>etc/</i></td>
+    <td> Default configuration for the build process</td>
+   </tr><tr>
+    <td>  <i>mk/</i></td>
+    <td> Build-system supplements</td>
+   </tr><tr>
+    <td>  <i>include/</i></td>
+    <td> Globally visible header files</td>
+   </tr><tr>
+    <td>  <i>src/</i></td>
+    <td> Source codes and target build descriptions</td>
+   </tr><tr>
+    <td>  <i>lib/mk/</i></td>
+    <td> Library build descriptions</td>
+   </tr><tr>
+    <td>  <i>lib/import/</i></td>
+    <td> Library import descriptions</td>
+   </tr><tr>
+    <td>  <i>ports/</i></td>
+    <td> Port descriptions of 3rd-party software</td>
+   </tr>
+   </table>
+   <p>
+   Table 1: Structure of a source-code repository. Depending on the repository, only a subset of those directories may be present.
+   </p>
+  <h2>
+  <a id="Integration_of_3rd-party_software"></a>
+  Integration of 3rd-party software</h2>
+   <p>
+    Downloaded 3rd-party source code resides outside of the actual repository at
+    the central <i>&lt;genode-dir&gt;/contrib/</i> directory. This structure has the
+    following benefits over hosting 3rd-party source code along with Genode's
+    genuine source code:
+   </p>
+   <ul>
+    <li>
+     <p>
+      Working with grep within the repositories works very efficient because
+      downloaded and extracted 3rd-party code is not in the way. Such code
+      resides next to the repositories.
+     </p>
+    </li>
+    <li>
+     <p>
+      Storing all build directories and downloaded 3rd-party source code somewhere
+      outside the Genode source tree, e.g., on different disk partitions, can
+      be easily accomplished by creating symbolic links for the <i>build/</i>
+      and <i>contrib/</i> directories.
+     </p>
+    </li>
+   </ul>
+   <p>
+    The <i>contrib/</i> directory is managed using the tools at
+    <i>&lt;genode-dir&gt;/tool/ports/</i>.
+   </p>
+   <div><dl>
+    <dt>Obtain a list of available ports</dt>
+    <dd>
+<pre>
+ tool/ports/list
+</pre>
+    </dd>
+    <dt>Download and install a port</dt>
+    <dd>
+<pre>
+ tool/ports/prepare_port &lt;port-name&gt;
+</pre>
+    </dd>
+   </dl></div>
+   <p>
+    The <i>prepare_port</i> tool scans all repositories under <i>repos/</i> for the specified
+    port and installs the port into <i>contrib/</i>. Each version
+    of an installed port resides in a dedicated subdirectory within the <i>contrib/</i>
+    directory. The port-specific directory is called port directory. It is named
+    <i>&lt;port-name&gt;-&lt;fingerprint&gt;</i>. The <i>&lt;fingerprint&gt;</i> uniquely identifies
+    the version of the port (it is a SHA1 hash of the ingredients of the
+    port). If two versions of the same port are installed, each of them will
+    have a different fingerprint. So they end up in different directories.
+   </p>
+   <p>
+    Within a source-code repository, a port is represented by two files, a
+    <i>&lt;port-name&gt;.port</i> and a <i>&lt;port-name&gt;.hash</i> file. Both files reside at the
+    <i>ports/</i> subdirectory of the corresponding repository. The
+    <i>&lt;port-name&gt;.port</i> file is the port description, which declares the
+    ingredients of the port, e.g., the archives to download and the patches to apply.
+    The <i>&lt;port-name&gt;.hash</i> file contains the fingerprint of the corresponding
+    port description, thereby uniquely identifying a version of the port
+    as expected by the checked-out Genode version.
+   </p>
+   <p>
+    For step-by-step instructions on how to add a port using the mechanism,
+    please refer to the porting guide:
+   </p>
+   <div><dl>
+    <dt>Genode Porting Guide</dt>
+    <dd>
+     <p>
+      <a href="http://genode.org/documentation/developer-resources/porting">http://genode.org/documentation/developer-resources/porting</a>
+     </p>
+    </dd>
+   </dl></div>
+  <h2>
+  <a id="Build_system"></a>
+  Build system</h2>
+   <h3>
+   <a id="Build_directories"></a>
+   Build directories</h3>
+   <div class="subsection">
+    <p>
+     The build system is supposed to never touch the source tree. The procedure of
+     building components and integrating them into system scenarios is performed
+     within a distinct <i>build directory</i>. One build directory targets a specific
+     kernel and hardware platform. Because the source tree is decoupled
+     from the build directory, one source tree can have many different build
+     directories associated, each targeted at a different platform.
+    </p>
+    <p>
+     The recommended way for creating a build directory is the use of the
+     <i>create_builddir</i> tool located at <i>&lt;genode-dir&gt;/tool/</i>.
+     The tool prints usage information along with a list of supported base
+     platforms when started without arguments.
+     For creating a new build directory, one of the listed target platforms must be
+     specified. By default, the new build directory is created at
+     <i>&lt;genode-dir&gt;/build/&lt;platform&gt;/</i> where <i>&lt;platform&gt;</i> corresponds to the
+     specified argument.
+     Alternatively, the default location can be overridden via the optional
+     <tt>BUILD_DIR=</tt> argument. For example:
+    </p>
+<pre>
+ cd &lt;genode-dir&gt;
+ ./tool/create_builddir x86_64 BUILD_DIR=/tmp/build.x86_64
+</pre>
+    <p>
+     This command creates a new build directory for the 64-bit x86 platform
+     at <i>/tmp/build.x86_64/</i>.
+     For the basic operations available from within the build directory, please
+     refer to Section <a href="getting_started.html#Using_the_build_system">Using the build system</a>.
+    </p>
+    <h4>
+    <a id="Configuration"></a>
+    Configuration</h4>
+     <p>
+      Each build directory contains a <i>Makefile</i>, which is a symbolic link to
+      <i>tool/builddir/build.mk</i>. The makefile is the front end of the build system
+      and not supposed to be edited. Besides the makefile, there is an <i>etc/</i>
+      subdirectory that contains the build-directory configuration. For most
+      platforms, there exists merely a single <i>build.conf</i> file, which defines the
+      source-code repositories to be incorporated into the build process along
+      with the parameters for the run tool explained in Section <a href="#Run_tool">Run tool</a>.
+     </p>
+     <p>
+      The selection of source-code repositories is defined by the REPOSITORIES
+      declaration, which contains a list of directories.
+      The <i>etc/build.conf</i> file as found in a freshly created build directory is
+      preconfigured to select the source-code repositories
+      <i>base-&lt;platform&gt;</i>, <i>base</i>, <i>os</i>, and <i>demo</i>.
+      There are a number of commented-out lines that can be uncommented for
+      enabling additional repositories.
+     </p>
+    <h4>
+    <a id="Cleaning"></a>
+    Cleaning</h4>
+     <p>
+      To remove all but kernel-related generated files, use
+     </p>
+<pre>
+ make clean
+</pre>
+     <p>
+      To remove all generated files, use
+     </p>
+<pre>
+ make cleanall
+</pre>
+     <p>
+      Both <tt>clean</tt> and <tt>cleanall</tt> won't remove any files from the <i>bin/</i>
+      subdirectory. This makes the <i>bin/</i> a safe place for files that are
+      unrelated to the build process, yet are required for the integration stage, e.g.,
+      binary data.
+     </p>
+    <h4>
+    <a id="Controlling_the_verbosity"></a>
+    Controlling the verbosity</h4>
+     <p>
+      To understand the inner workings of the build process in more detail, you can
+      tell the build system to display each directory change by specifying
+     </p>
+<pre>
+ make VERBOSE_DIR=
+</pre>
+     <p>
+      If you are interested in the arguments that are passed to each invocation of
+      <tt>make</tt>, you can make them visible via
+     </p>
+<pre>
+ make VERBOSE_MK=
+</pre>
+     <p>
+      Furthermore, you can observe each single shell-command invocation by specifying
+     </p>
+<pre>
+ make VERBOSE=
+</pre>
+     <p>
+      Of course, you can combine these verboseness toggles for maximizing the noise.
+     </p>
+   </div>
+   <h3>
+   <a id="Target_descriptions"></a>
+   Target descriptions</h3>
+   <div class="subsection">
+    <p>
+     Each build target is represented by a corresponding <i>target.mk</i> file within
+     the <i>src/</i> subdirectory of a source-code repository.
+     This file declares the name of the target, the source codes to be incorporated
+     into the target, and the libraries the target depends on.
+     The build system evaluates target descriptions using <i>make</i>. Hence, the syntax
+     corresponds to the syntax of makefiles and the principle functionality
+     of make is available for <i>target.mk</i> files. For example, it is possible to
+     define custom rules as done in
+     Section <a href="#Building_tools_to_be_executed_on_the_host_platform">Building tools to be executed on the host platform</a>.
+    </p>
+    <h4>
+    <a id="Target_declarations"></a>
+    Target declarations</h4>
+     <div><dl>
+      <dt><tt>TARGET</tt></dt>
+      <dd>
+       <p>
+        is the name of the binary to be created. This is the
+        only <b>mandatory variable</b> to be defined in each <i>target.mk</i> file.
+       </p>
+      </dd>
+      <dt><tt>LIBS</tt></dt>
+      <dd>
+       <p>
+        is the list of libraries that are used by the target.
+       </p>
+      </dd>
+      <dt><tt>SRC_CC</tt></dt>
+      <dd>
+       <p>
+        contains the list of <tt>.cc</tt> source files. The default search location
+        for source codes is the directory where the <i>target.mk</i> file resides.
+       </p>
+      </dd>
+      <dt><tt>SRC_C</tt></dt>
+      <dd>
+       <p>
+        contains the list of <tt>.c</tt> source files.
+       </p>
+      </dd>
+      <dt><tt>SRC_S</tt></dt>
+      <dd>
+       <p>
+        contains the list of assembly <tt>.s</tt> source files.
+       </p>
+      </dd>
+      <dt><tt>SRC_BIN</tt></dt>
+      <dd>
+       <p>
+        contains binary data files to be linked to the target.
+       </p>
+      </dd>
+      <dt><tt>INC_DIR</tt></dt>
+      <dd>
+       <p>
+        is the list of include search locations. Directories should
+        always be appended by using <tt>+=</tt>.
+       </p>
+      </dd>
+      <dt><tt>REQUIRES</tt></dt>
+      <dd>
+       <p>
+        expresses the requirements that must be satisfied in order to
+        build the target. More details about the underlying mechanism is provided
+        by Section <a href="#Platform_specifications">Platform specifications</a>.
+       </p>
+      </dd>
+      <dt><tt>CC_OPT</tt></dt>
+      <dd>
+       <p>
+        contains additional compiler options to be used for <tt>.c</tt> as
+        well as for <tt>.cc</tt> files.
+       </p>
+      </dd>
+      <dt><tt>CC_CXX_OPT</tt></dt>
+      <dd>
+       <p>
+        contains additional compiler options to be used for the
+        C++ compiler only.
+       </p>
+      </dd>
+      <dt><tt>CC_C_OPT</tt></dt>
+      <dd>
+       <p>
+        contains additional compiler options to be used for the
+        C compiler only.
+       </p>
+      </dd>
+      <dt><tt>EXT_OBJECTS</tt></dt>
+      <dd>
+       <p>
+        is a list of external objects or libraries. This
+        declaration is merely used for interfacing Genode with legacy software
+        components.
+       </p>
+      </dd>
+     </dl></div>
+    <h4>
+    <a id="Specifying_search_locations"></a>
+    Specifying search locations</h4>
+     <p>
+      When specifying search locations for header files via the <tt>INC_DIR</tt> variable or
+      for source files via <tt>vpath</tt>, the use of relative pathnames is illegal. Instead,
+      the following variables can be used to reference locations within the
+      source-code repository where the target resides:
+     </p>
+     <div><dl>
+      <dt><tt>REP_DIR</tt></dt>
+      <dd>
+       <p>
+        is the base directory of the target's source-code repository.
+        Normally, specifying locations relative to the base of the repository is
+        rarely used by <i>target.mk</i> files but needed by library descriptions.
+       </p>
+      </dd>
+      <dt><tt>PRG_DIR</tt></dt>
+      <dd>
+       <p>
+        is the directory where the <i>target.mk</i> file resides. This
+        variable is always to be used when specifying a relative path.
+       </p>
+      </dd>
+      <dt><tt>$(call&nbsp;select_from_repositories,path/relative/to/repo)</tt></dt>
+      <dd>
+       <p>
+        This function returns the absolute path for the given repository-relative
+        path by looking at all source-code repositories in their configured order.
+        Hereby, it is possible to access files or directories that are outside
+        the target's source-code repository.
+       </p>
+      </dd>
+      <dt><tt>$(call&nbsp;select_from_ports,&lt;port-name&gt;)</tt></dt>
+      <dd>
+       <p>
+        This function returns the absolute path for the <i>contrib</i> directory of the
+        specified <i>&lt;port-name&gt;</i>. The contrib directory is located at
+        <i>&lt;genode-dir&gt;/contrib/&lt;port-name&gt;-&lt;fingerprint&gt;</i> whereby <i>&lt;fingerprint&gt;</i>
+        uniquely identifies the version of the port as expected by the current state
+        of the Genode source tree.
+       </p>
+      </dd>
+     </dl></div>
+   </div>
+   <h3>
+   <a id="Library_descriptions"></a>
+   Library descriptions</h3>
+   <div class="subsection">
+    <p>
+     In contrast to target descriptions that are scattered across the whole source
+     tree, library descriptions are located at the central place <i>lib/mk</i>. Each
+     library corresponds to a <i>&lt;libname&gt;.mk</i> file. The base of the description file
+     is the name of the library. Therefore, no <tt>TARGET</tt> variable needs to be
+     defined.
+     The location of source-code files is usually defined relative to <tt>$(REP_DIR)</tt>.
+     Library-description files support the following additional declaration:
+    </p>
+    <div><dl>
+     <dt><tt>SHARED_LIB&nbsp;=&nbsp;yes</tt></dt>
+     <dd>
+      <p>
+       declares that the library should be built as a shared
+       object rather than a static library. The resulting object will be called
+       <i>&lt;libname&gt;.lib.so</i>.
+      </p>
+     </dd>
+    </dl></div>
+   </div>
+   <h3>
+   <a id="Platform_specifications"></a>
+   Platform specifications</h3>
+   <div class="subsection">
+    <p>
+     Building components for different platforms likely implicates that portions of
+     code are tied to certain aspects of the target platform. For example, target
+     platforms may differ in the following respects:
+    </p>
+    <ul>
+     <li>
+      <p>
+       The API of the used kernel,
+      </p>
+     </li>
+     <li>
+      <p>
+       The hardware architecture such as x86, ARMv7,
+      </p>
+     </li>
+     <li>
+      <p>
+       Certain hardware facilities such as a custom device, or
+      </p>
+     </li>
+     <li>
+      <p>
+       Other considerations such as software license requirements.
+      </p>
+     </li>
+    </ul>
+    <p>
+     Each of those aspects may influence the build process in different ways.
+     The build system provides a generic mechanism to steer the build process
+     according to such aspects.
+     Each aspect is represented by a tag called <i>spec value</i>.
+     Any platform targeted by Genode can be characterized by a set of such spec
+     values.
+    </p>
+    <p>
+     The <b>developer</b> of a software component knows the constraints of his
+     software and thus specifies these requirements in the build-description
+     file of the component.
+     The <b>system integrator</b> defines the platform the software will be
+     built for by specifying the targeted platform in the SPECS declaration in the
+     build directory's <i>etc/specs.conf</i> file.
+     In addition to the (optional) <i>etc/specs.conf</i>
+     file within the build directory, the build system incorporates all
+     <i>etc/specs.conf</i> files found in the enabled repositories. For example, when
+     using the Linux kernel as a platform, the <i>base-linux/etc/specs.conf</i> file is
+     picked up automatically. The build directory's <tt>specs.conf</tt> file can still be
+     used to extend the SPECS declarations, for example to enable special features.
+    </p>
+    <p>
+     Each <i>&lt;spec&gt;</i> in the SPECS variable instructs the build system to
+    </p>
+    <ul>
+     <li>
+      <p>
+       Include the make-rules of a corresponding <i>base/mk/spec/&lt;specname&gt;.mk</i>
+       file. This enables the customization of the build process for each platform.
+      </p>
+     </li>
+     <li>
+      <p>
+       Search for <i>&lt;libname&gt;.mk</i> files in the <i>lib/mk/spec/&lt;specname&gt;/</i> subdirectory.
+       This way, alternative implementations of one and the same
+       library interface can be selected depending on the platform specification.
+      </p>
+     </li>
+    </ul>
+    <p>
+     Before a target or library gets built, the build system checks if the REQUIRES
+     entries of the build description file are satisfied by entries of the SPECS
+     variable. The compilation is executed only if each entry in the REQUIRES
+     variable is present in the SPECS variable as supplied by the build directory
+     configuration.
+    </p>
+   </div>
+   <h3>
+   <a id="Building_tools_to_be_executed_on_the_host_platform"></a>
+   Building tools to be executed on the host platform</h3>
+   <div class="subsection">
+    <p>
+     Sometimes, software requires custom tools that are used to generate source
+     code or other ingredients for the build process, for example IDL compilers.
+     Such tools won't be executed on top of Genode but on the host platform
+     during the build process. Hence, they must be compiled with the tool chain
+     installed on the host, not the Genode tool chain.
+    </p>
+    <p>
+     The build system accommodates the building of such host tools as a side
+     effect of building a library or a target. Even though it is possible to add
+     the tool-compilation step to a regular build description file, it is
+     recommended to introduce a dedicated pseudo library for building such tools.
+     This way, the rules for building host tools are kept separate from rules that
+     refer to regular targets. By convention, the pseudo library should be named
+     <i>&lt;package&gt;_host_tools</i> and the host tools should be built at
+     <i>&lt;build-dir&gt;/tool/&lt;package&gt;/</i> where <i>&lt;package&gt;</i> refers to the name of the
+     software package the tool belongs to, e.g., qt5 or mupdf. To build a tool
+     named <i>&lt;tool&gt;</i>, the pseudo library contains a custom make rule like the
+     following:
+    </p>
+<pre>
+ $(BUILD_BASE_DIR)/tool/&lt;package&gt;/&lt;tool&gt;:
+     $(MSG_BUILD)$(notdir $@)
+     $(VERBOSE)mkdir -p $(dir $@)
+     $(VERBOSE)...build commands...
+</pre>
+    <p>
+     To let the build system trigger the rule, add the custom target to the
+     <tt>HOST_TOOLS</tt> variable:
+    </p>
+<pre>
+ HOST_TOOLS += $(BUILD_BASE_DIR)/tool/&lt;package&gt;/&lt;tool&gt;
+</pre>
+    <p>
+     Once the pseudo library for building the host tools is in place, it can be
+     referenced by each target or library that relies on the respective tools via
+     the <tt>LIBS</tt> declaration. The tool can be invoked by referring to
+     <tt>$(BUILD_BASE_DIR)/tool/&lt;package&gt;/tool</tt>.
+    </p>
+    <p>
+     For an example of using custom host tools, please refer to the mupdf package
+     found within the libports repository. During the build of the mupdf library,
+     two custom tools fontdump and cmapdump are invoked. The tools are built via
+     the <i>lib/mk/mupdf_host_tools.mk</i> library description file. The actual mupdf
+     library (<i>lib/mk/mupdf.mk</i>) has the pseudo library <tt>mupdf_host_tools</tt> listed
+     in its <tt>LIBS</tt> declaration and refers to the tools relative to
+     <tt>$(BUILD_BASE_DIR)</tt>.
+    </p>
+   </div>
+   <h3>
+   <a id="Building_3rd-party_software"></a>
+   Building 3rd-party software</h3>
+   <div class="subsection">
+    <p>
+     The source code of 3rd-party software is managed by the mechanism presented in
+     Section <a href="#Integration_of_3rd-party_software">Integration of 3rd-party software</a>. Once prepared, such source codes
+     resides in a subdirectory of <i>&lt;genode-dir&gt;/contrib/</i>.
+    </p>
+    <p>
+     If the build system encounters a target that incorporates
+     ported source code (that is, a build-description file that calls the
+     <tt>select_from_ports</tt> function), it looks up the respective <i>&lt;port-name&gt;.hash</i>
+     file in the
+     repositories as specified in the build configuration. The fingerprint found in
+     the hash file is used to construct the path to the port directory under
+     <i>contrib/</i>. If that lookup fails, a meaningful error is printed. Any number of
+     versions of the same port can be installed at the same time. I.e., when
+     switching Git branches that use different versions of the same port, the build
+     system automatically finds the right port version as expected by the currently
+     active branch.
+    </p>
+   </div>
+  <h2>
+  <a id="System_integration_and_automated_testing"></a>
+  System integration and automated testing</h2>
+   <p>
+    Genode's portability across kernels and hardware platforms is one of the prime
+    features of the framework. However, each kernel or hardware platform requires
+    different considerations when it comes to system configuration, integration, and
+    booting. When using a particular kernel, profound knowledge
+    about the boot concept and the kernel-specific tools is required. To
+    streamline the testing of system scenarios across the many different supported
+    kernels and hardware platforms, the framework is equipped with tools that
+    relieve the system integrator from these peculiarities.
+   </p>
+   <h3>
+   <a id="Run_tool"></a>
+   Run tool</h3>
+   <div class="subsection">
+    <p>
+     The centerpiece of the system-integration infrastructure is the so-called run
+     tool. Directed by a script (run script), it performs all the steps necessary to
+     test a system scenario. Those steps are:
+    </p>
+    <ol>
+     <li>
+      <p>
+       <b>Building</b> the components of a scenario
+      </p>
+     </li>
+     <li>
+      <p>
+       <b>Configuration</b> of the init component
+      </p>
+     </li>
+     <li>
+      <p>
+       Assembly of the <b>boot directory</b>
+      </p>
+     </li>
+     <li>
+      <p>
+       Creation of the <b>boot image</b>
+      </p>
+     </li>
+     <li>
+      <p>
+       <b>Powering-on</b> the test machine
+      </p>
+     </li>
+     <li>
+      <p>
+       <b>Loading</b> of the boot image
+      </p>
+     </li>
+     <li>
+      <p>
+       Capturing the <b>LOG output</b>
+      </p>
+     </li>
+     <li>
+      <p>
+       <b>Validation</b> of the scenario's behavior
+      </p>
+     </li>
+     <li>
+      <p>
+       <b>Powering-off</b> the test machine
+      </p>
+     </li>
+    </ol>
+    <p>
+     Each of those steps depends on various parameters such as the
+     used kernel, the hardware platform used to execute the scenario, the
+     way the test hardware is connected to the test infrastructure
+     (e.g., UART, AMT, JTAG, network), the way the test hardware is powered or
+     reseted, or the way of how the scenario is loaded into the test hardware.
+     To accommodate the variety of combinations of these
+     parameters, the run tool consists of an extensible library of modules.
+     The selection and configuration of the modules is expressed in the run-tool
+     configuration. The following types of modules exist:
+    </p>
+    <div><dl>
+     <dt>boot-dir modules</dt>
+     <dd>
+      <p>
+       These modules contain the functionality to populate the boot directory
+       and are specific to each kernel. It is mandatory to always include the
+       module corresponding to the used kernel.
+      </p>
+      <p>
+       <i>(the available modules are: linux, hw, okl4, fiasco, pistachio, nova,</i>
+       <i>sel4, foc)</i>
+      </p>
+     </dd>
+     <dt>image modules</dt>
+     <dd>
+      <p>
+       These modules are used to wrap up all components used by the run script
+       in a specific format and thereby prepare them for execution.
+       Depending on the used kernel, different formats can be used. With these
+       modules, the creation of ISO and disk images is also handled.
+      </p>
+      <p>
+       <i>(the available modules are: uboot, disk, iso)</i>
+      </p>
+     </dd>
+     <dt>load modules</dt>
+     <dd>
+      <p>
+       These modules handle the way the components are transfered to the
+       target system. Depending on the used kernel there are various options
+       to pass on the components. For example, loading from TFTP or via JTAG is handled
+       by the modules of this category.
+      </p>
+      <p>
+       <i>(the available modules are: tftp, jtag, fastboot, ipxe)</i>
+      </p>
+     </dd>
+     <dt>log modules</dt>
+     <dd>
+      <p>
+       These modules handle how the output of a currently executed run script
+       is captured.
+      </p>
+      <p>
+       <i>(the available modules are: qemu, linux, serial, amt)</i>
+      </p>
+     </dd>
+     <dt>power_on modules</dt>
+     <dd>
+      <p>
+       These modules are used for bringing the target system into a defined
+       state, e.g., by starting or rebooting the system.
+      </p>
+      <p>
+       <i>(the available modules are: qemu, linux, softreset, amt, netio)</i>
+      </p>
+     </dd>
+     <dt>power_off modules</dt>
+     <dd>
+      <p>
+       These modules are used for turning the target system off after the
+       execution of a run script.
+      </p>
+     </dd>
+    </dl></div>
+    <p>
+     Each module has the form of a script snippet located under the
+     <i>tool/run/&lt;step&gt;/</i>
+     directory where <i>&lt;step&gt;</i> is a subdirectory named after the module type.
+     Further instructions about the use of each module (e.g., additional
+     configuration arguments) can be found in the form of comments inside the
+     respective script snippets.
+     Thanks to this modular structure,
+     an extension of the tool kit comes down to adding a file at the corresponding
+     module-type subdirectory. This way, custom work flows (such as tunneling JTAG
+     over SSH) can be accommodated fairly easily.
+    </p>
+   </div>
+   <h3>
+   <a id="Run-tool_configuration_examples"></a>
+   Run-tool configuration examples</h3>
+   <div class="subsection">
+    <p>
+     To execute a run script, a combination of modules may be used. The combination
+     is controlled via the RUN_OPT declaration contained in the build directory's
+     <i>etc/build.conf</i> file.
+     The following examples illustrate the selection and configuration of different
+     run modules:
+    </p>
+    <h4>
+    <a id="Executing_NOVA_in_Qemu"></a>
+    Executing NOVA in Qemu</h4>
+<pre>
+RUN_OPT = --include boot_dir/nova \
+          --include power_on/qemu --include log/qemu --include image/iso
+</pre>
+     <p>
+      By including <tt>boot_dir/nova</tt>, the run tool assembles a boot directory equipped
+      with a boot loader and a boot-loader configuration that is able to bootstrap
+      the NOVA kernel. The combination of the modules <tt>power_on/qemu</tt> and <tt>log/qemu</tt>
+      prompts the run tool to spawn the Qemu emulator with the generated boot image
+      and fetch the log output of the emulated machine from its virtual comport.
+      The specification of <tt>image/iso</tt> tells the run tool to use a bootable
+      ISO image as a boot medium as opposed to a disk image.
+     </p>
+    <h4>
+    <a id="Executing_NOVA_on_a_real_x86_machine_using_AMT"></a>
+    Executing NOVA on a real x86 machine using AMT</h4>
+     <p>
+      The following example uses Intel's advanced management technology (AMT)
+      to remotely reset a physical target machine (<tt>power_on/amt</tt>)
+      and capture the serial output over network (<tt>log/amt</tt>). In contrast to the
+      example above, the system scenario is supplied via TFTP (<tt>load/tftp</tt>). Note
+      that the example requires a working network-boot setup including a TFTP
+      server, a DHCP server, and a PXE boot loader.
+     </p>
+<pre>
+RUN_OPT = --include boot_dir/nova \
+          --include power_on/amt \
+                  --power-on-amt-host 10.23.42.13 \
+                  --power-on-amt-password 'foo!' \
+          --include load/tftp \
+                  --load-tftp-base-dir /var/lib/tftpboot \
+                  --load-tftp-offset-dir /x86 \
+          --include log/amt \
+                  --log-amt-host 10.23.42.13 \
+                  --log-amt-password 'foo!'
+</pre>
+     <p>
+      If the test machine has a comport connection to the machine where the run
+      tool is executed, the <tt>log/serial</tt> module may be used instead of 'log/amt':
+     </p>
+<pre>
+ --include log/serial --log-serial-cmd 'picocom -b 115200 /dev/ttyUSB0'
+</pre>
+    <h4>
+    <a id="Executing_base-hw_on_a_Raspberry_Pi"></a>
+    Executing base-hw on a Raspberry Pi</h4>
+     <p>
+      The following example boots a system scenario based on the base-hw kernel on
+      a Raspberry Pi that is powered via a network-controllable power plug (netio).
+      The Raspberry Pi is connected to a JTAG debugger, which is used to load the
+      system image onto the device.
+     </p>
+<pre>
+RUN_OPT = --include boot_dir/hw \
+          --include power_on/netio \
+                  --power-on-netio-ip 10.23.42.5 \
+                  --power-on-netio-user admin \
+                  --power-on-netio-password secret \
+                  --power-on-netio-port 1 \
+          --include power_off/netio \
+                  --power-off-netio-ip 10.23.42.5 \
+                  --power-off-netio-user admin \
+                  --power-off-netio-password secret \
+                  --power-off-netio-port 1 \
+          --include load/jtag \
+          --load-jtag-debugger \
+              /usr/share/openocd/scripts/interface/flyswatter2.cfg \
+          --load-jtag-board \
+              /usr/share/openocd/scripts/interface/raspberrypi.cfg \
+          --include log/serial \
+                  --log-serial-cmd 'picocom -b 115200 /dev/ttyUSB0'
+</pre>
+   </div>
+   <h3>
+   <a id="Meaningful_default_behaviour"></a>
+   Meaningful default behaviour</h3>
+   <div class="subsection">
+    <p>
+     The <tt>create_builddir</tt> tool introduced in Section <a href="getting_started.html#Using_the_build_system">Using the build system</a>
+     equips a freshly created build directory with a meaningful
+     default configuration that depends on the selected platform and the used
+     kernel. For example, when creating a build directory for the x86_64 base
+     platform and building a scenario with <tt>KERNEL=linux</tt>, <tt>RUN_OPT</tt> is
+     automatically defined as
+    </p>
+<pre>
+ RUN_OPT = --include boot_dir/linux \
+           --include power_on/linux --include log/linux
+</pre>
+   </div>
+   <h3>
+   <a id="Run_scripts"></a>
+   Run scripts</h3>
+   <div class="subsection">
+    <p>
+     Using run scripts, complete system scenarios can be described in a
+     concise and kernel-independent way. As
+     described in Section <a href="getting_started.html#A_simple_system_scenario">A simple system scenario</a>, a run script can be used
+     to integrate and test-drive the scenario directly from the build directory.
+     The best way to get acquainted with the concept is by reviewing the run script
+     for the hello-world example presented in Section <a href="getting_started.html#Defining_a_system_scenario">Defining a system scenario</a>.
+     It performs the following steps:
+    </p>
+    <ol>
+     <li>
+      <p>
+       Building the components needed for the system using the <tt>build</tt> command.
+       This command instructs the build system to compile the targets listed in
+       the brace block. It has the same effect as manually invoking <tt>make</tt> with
+       the specified argument from within the build directory.
+      </p>
+     </li>
+     <li>
+      <p>
+       Creating a new boot directory using the <tt>create_boot_directory</tt> command.
+       The integration of the scenario is performed in a dedicated directory at
+       <i>&lt;build-dir&gt;/var/run/&lt;run-script-name&gt;/</i>. When the run script is finished,
+       this boot directory will contain all components of the final system.
+      </p>
+     </li>
+     <li>
+      <p>
+       Installing the configuration for the init component into the boot directory
+       using the
+       <tt>install_config</tt> command. The argument to this command will be written
+       to a file called <tt>config</tt> within the boot directory. It will eventually
+       be loaded as boot module and made available by core's ROM service
+       to the init component. The configuration of init is explained in
+       Chapter <a href="system_configuration.html#System_configuration">System configuration</a>.
+      </p>
+     </li>
+     <li>
+      <p>
+       Creating a bootable system image using the <tt>build_boot_image</tt> command.
+       This command copies the specified list of files from the <i>&lt;build-dir&gt;/bin/</i>
+       directory to the boot directory and executes the steps
+       needed to transform the content of the boot directory into a bootable
+       form.
+       Under the hood, the run tool invokes the run-module types <i>boot_dir</i> and
+       <i>boot_image</i>.
+       Depending on the run-tool configuration, this form may be an ISO
+       image, a disk image, or a bootable ELF image.
+      </p>
+     </li>
+     <li>
+      <p>
+       Executing the system image using the <tt>run_genode_until</tt> command. Depending
+       on the run-tool configuration,
+       the system image is executed using an emulator or a physical machine.
+       Under the hood, this step invokes the run modules of the types
+       <i>power_on</i>, <i>load</i>, <i>log</i>, and <i>power_off</i>.
+       For most platforms, Qemu is used by default. On Linux,
+       the scenario is executed by starting core directly from the boot
+       directory. The <tt>run_genode_until</tt> command takes a regular expression
+       as argument. If the log output of the scenario matches the specified
+       pattern, the <tt>run_genode_until</tt> command returns. If specifying <tt>forever</tt>
+       as argument, this command will never return.
+       If a regular expression is specified, an additional argument determines
+       a timeout in seconds. If the regular expression does not match until
+       the timeout is reached, the run script will abort.
+      </p>
+     </li>
+    </ol>
+    <p>
+     After the successful completion of a run script, the run tool prints the
+     message "Run script execution successful.".
+    </p>
+    <p>
+     Note that the <i>hello.run</i> script does not contain kernel-specific information.
+     Therefore it can be executed from the build directory of any base platform
+     via the command <tt>make&nbsp;run/hello&nbsp;KERNEL=&lt;kernel&gt;</tt>.
+     When invoking <tt>make</tt> with an argument of the form <tt>run/&lt;run-script&gt;</tt>, the
+     build system searches all repositories for a run script with the specified name.
+     The run script must be located in one of the repositories' <i>run/</i> subdirectories
+     and have the file extension <tt>.run</tt>.
+    </p>
+   </div>
+   <h3>
+   <a id="The_run_mechanism_explained"></a>
+   The run mechanism explained</h3>
+   <div class="subsection">
+    <p>
+     The run tool is based on <i>expect</i>, which is an extension of the Tcl scripting
+     language that allows for the scripting of interactive command-line-based
+     programs.
+     When the user invokes a run script via <i>make run/&lt;run-script&gt;</i>, the build
+     system invokes
+     the run tool at <i>&lt;genode-dir&gt;/tool/run/run</i> with the run script and the
+     content of the <tt>RUN_OPT</tt> definition as arguments. The
+     run tool is an expect script that has no other purpose than defining several
+     commands used by run scripts and including the run modules as specified by the
+     run-tool configuration.
+     Whereas <i>tool/run/run</i> provides the generic commands, the run modules under
+     <i>tool/run/&lt;module&gt;/</i> contain all the peculiarities of the various kernels
+     and boot strategies.
+     The run modules thereby document
+     precisely how the integration and boot concept works
+     for each kernel platform.
+    </p>
+    <h4>
+    <a id="Run_modules"></a>
+    Run modules</h4>
+     <p>
+      Each module consist of an expect source file located in one of the existing
+      directories of a category. It is named implicitly by its location and the
+      name of the source file, e.g. <i>image/iso</i> is the name of the image module
+      that creates an ISO image.
+      The source file contains one mandatory function:
+     </p>
+<pre>
+ run_&lt;module&gt; { &lt;module-args&gt; }
+</pre>
+     <p>
+      The function is called if the step is executed by the run tool. If its
+      execution was successful, it returns true and otherwise false. Certain modules
+      may also call exit on failure.
+     </p>
+     <p>
+      A module may have arguments, which are - by convention - prefixed with the name
+      of the module, e.g., <tt>power_on/amt</tt> has an argument called
+      <tt>&ndash;power-on-amt-host</tt>. By convention, the modules contain accessor functions
+      for argument values. For example, the function <tt>power_on_amt_host</tt> in the run module
+      <i>power_on/amt</i> returns the value supplied to the argument <tt>&ndash;power-on-amt-host</tt>.
+      Thereby, a run script can access the value of such arguments
+      in a defined way by calling <tt>power_on_amt_host</tt>. Also, arguments without a value
+      are treated similarly. For example, for querying the presence of the argument
+      <tt>&ndash;image-uboot-no-gzip</tt>, the run module <i>run/image/uboot</i>
+      provides the corresponding function <tt>image_uboot_use_no_gzip</tt>.
+      In addition to these functions, a module may have additional public
+      functions. Those functions may be used by run scripts or other modules.
+      To enable a run script or module to query the presence of another module,
+      the run tool provides the function <tt>have_include</tt>. For example, the presence of
+      the <i>load/tftp</i> module can be checked by calling <tt>have_include</tt> with the
+      argument <tt>"load/tftp"</tt>.
+     </p>
+   </div>
+   <h3>
+   <a id="Using_run_scripts_to_implement_integration_tests"></a>
+   Using run scripts to implement integration tests</h3>
+   <div class="subsection">
+    <p>
+     Because run scripts are actually expect scripts, the whole arsenal of
+     language features of the Tcl scripting language is available to them. This
+     turns run scripts into powerful tools for the automated execution of test
+     cases. A good example is the run script at <i>repos/libports/run/lwip.run</i>,
+     which tests the lwIP stack by running a simple Genode-based HTTP server on the
+     test machine. It fetches and validates a HTML page from this server. The run
+     script makes use of a regular expression as argument to the <tt>run_genode_until</tt>
+     command to detect the state when the web server becomes ready, subsequently
+     executes the <tt>lynx</tt> shell command to fetch the web site, and employs Tcl's
+     support for regular expressions to validate the result. The run script works
+     across all platforms that have network support.
+     To accommodate a high diversity of platforms, parts of the run script depend
+     on the <i>spec</i> values as defined for the build directory. The spec values
+     are probed via the <tt>have_spec</tt> function. Depending on the probed spec
+     values, the run script uses the <tt>append_if</tt> and <tt>lappend_if</tt> commands
+     to conditionally assemble the init configuration and the list of boot modules.
+    </p>
+    <p>
+     To use the run mechanism efficiently, a basic understanding of the Tcl
+     scripting language is required. Furthermore the functions provided by
+     <i>tool/run/run</i> and the run modules at <i>tool/run/</i> should be studied.
+    </p>
+   </div>
+   <h3>
+   <a id="Automated_testing_across_base_platforms"></a>
+   Automated testing across base platforms</h3>
+   <div class="subsection">
+    <p>
+     To execute one or multiple test cases on more than one base platform, there
+     exists a dedicated tool at <i>tool/autopilot</i>. Its primary purpose is the
+     nightly execution of test cases. The tool takes a list of platforms and of
+     run scripts as arguments and executes each run script on each platform. The
+     build directory for each platform is created at
+     <i>/tmp/autopilot.&lt;username&gt;/&lt;platform&gt;</i> and the output of each run script is
+     written to a file called <i>&lt;platform&gt;.&lt;run-script&gt;.log</i>. On stderr, autopilot
+     prints the statistics about whether or not each run script executed
+     successfully on each platform. If at least one run script failed, autopilot
+     returns a non-zero exit code, which makes it straight forward to include
+     autopilot into an automated build-and-test environment.
+    </p>
+   </div>
+  <h2>
+  <a id="Git_flow"></a>
+  Git flow</h2>
+   <p>
+    The official Genode Git repository is available at the project's GitHub
+    site:
+   </p>
+   <div><dl>
+    <dt>GitHub project</dt>
+    <dd>
+     <p>
+      https://github.com/genodelabs/genode
+     </p>
+    </dd>
+   </dl></div>
+   <h3>
+   <a id="Master_and_staging"></a>
+   Master and staging</h3>
+   <div class="subsection">
+    <p>
+     The official Git repository has two branches "master" and "staging".
+    </p>
+    <h4>
+    <a id="Master_branch"></a>
+    Master branch</h4>
+     <p>
+      The master branch is the recommended branch for users of the framework.
+      It is known to have passed quality tests. The existing history of this
+      branch is fixed and will never change.
+     </p>
+    <h4>
+    <a id="Staging_branch"></a>
+    Staging branch</h4>
+     <p>
+      The staging branch contains the commits that are scheduled for inclusion
+      into the master branch. However, before changes are merged into the master
+      branch, they are subjected to quality-assurance measures conducted by
+      Genode Labs. Those measures include the successful building of the framework
+      for all base platforms and the passing of automated tests. After changes
+      enter the staging branch, those quality-assurance measures are expected to
+      fail. If so, the changes are successively refined by a series of <i>fixup</i>
+      commits. Each fixup commit should refer to the commit it is refining using a
+      commit message as follows:
+     </p>
+<pre>
+ fixup "&lt;commit message of the refined commit&gt;"
+</pre>
+     <p>
+      If the fixup is non-trivial, change the "fixup" prefix to "squash" and add
+      a more elaborative description to the commit message.
+     </p>
+     <p>
+      Once the staging branch passes the quality-assurance measures, the Genode
+      maintainers tidy-up the history of the staging branch by merging all fixup
+      commits with their respective original commit. The resulting commits are then
+      merged on top of the master branch and the staging branch is reset to the new
+      master branch.
+     </p>
+     <p>
+      Note that the staging branch is volatile. In contrast to the master branch,
+      its history is not stable. Hence, it should not be used to base developments
+      on.
+     </p>
+    <h4>
+    <a id="Release_version"></a>
+    Release version</h4>
+     <p>
+      The version number of a Genode release refers to the release date. The
+      two-digit major number corresponds to the last two digits of the year and
+      the two-digit minor number corresponds to the month. For example, "17.02".
+     </p>
+     <p>
+      Each Genode release represents a snapshot of the master branch taken at
+      release time. It is complemented by the following commits:
+     </p>
+     <ul>
+      <li>
+       <p>
+        "Release notes for version &lt;version&gt;" containing the release documentation
+        in the form of a text file at <i>doc/release_notes</i>,
+       </p>
+      </li>
+      <li>
+       <p>
+        "News item for Genode &lt;version&gt;" containing the release announcement as
+        published at the <i>genode.org</i> website,
+       </p>
+      </li>
+      <li>
+       <p>
+        "Version: &lt;version&gt;" with the adaptation of the <i>VERSION</i> file.
+       </p>
+      </li>
+     </ul>
+     <p>
+      The latter commit is tagged with the version number. The tag is signed by one
+      of the mainline developers.
+     </p>
+   </div>
+   <h3>
+   <a id="Development_practice"></a>
+   Development practice</h3>
+   <div class="subsection">
+    <p>
+     Each developer maintains a fork of Genode's Git repository. To facilitate
+     close collaboration with the developer community, it is recommended
+     to host the fork on GitHub. Open a GitHub account, use GitHub's web
+     interface to create a new fork, and follow the steps given by GitHub
+     to fetch the cloned repository to your development machine.
+    </p>
+    <p>
+     In the following, we refer to the official Genode repository as
+     "genodelabs/genode". To conveniently follow the project's mainline
+     development, it is recommended to register the official repository as a
+     "remote" in your Git repository:
+    </p>
+<pre>
+ git remote add genodelabs https://github.com/genodelabs/genode.git
+</pre>
+    <p>
+     Once, the official repository is known to your clone, you can fetch new
+     official revisions via
+    </p>
+<pre>
+ git fetch genodelabs
+</pre>
+    <h4>
+    <a id="Topic_branches"></a>
+    Topic branches</h4>
+     <p>
+      As a rule of thumb, every line of development has a corresponding
+      topic in the issue tracker. This is the place where the developers discuss and
+      review
+      the ongoing work. Hence, when starting a new line of development, the first
+      step should be the creation of a new topic.
+     </p>
+     <div><dl>
+      <dt>Issue tracker</dt>
+      <dd>
+       <p>
+        <a href="https://github.com/genodelabs/genode/issues">https://github.com/genodelabs/genode/issues</a>
+       </p>
+      </dd>
+     </dl></div>
+     <p>
+      The new topic should be accompanied with a short description about the
+      motivation behind the line of work and the taken approach.
+      The second step is the creation of a dedicated topic branch in the developer's
+      fork of Genode's Git repository.
+     </p>
+<pre>
+ git checkout -b issue&lt;number&gt; genodelabs/master
+</pre>
+     <p>
+      The new topic branch should be based on the
+      most current <i>genodelabs/master</i> branch. This eases the later integration of
+      the topic branch into the mainline development.
+     </p>
+     <p>
+      While working on a topic branch, it is recommended to commit many small
+      intermediate steps. This is useful to keep track of the line of thoughts
+      during development. This history is regarded as volatile. That is, it is not
+      set in stone. Hence, you as developer do not have to spend too much thoughts
+      on the commits during the actual development.
+     </p>
+     <p>
+      Once the work on the topic is completed and the topic branch is going to get
+      integrated into the mainline development, the developer curates the
+      topic-branch history so that a short and well-arranged sequence of commits
+      remains. This step is usually performed by interactively editing the
+      topic-branch history via the <tt>git&nbsp;rebase&nbsp;-i</tt> command.
+      In many cases,
+      the entire topic branch can be squashed into a single commit. The goal behind
+      this curating step is to let the mainline history document the progress at a
+      level of detail that is meaningful for the users of the framework. The
+      mainline history should satisfy the following:
+     </p>
+     <ul>
+      <li>
+       <p>
+        The relationship of a commit with an issue at the issue tracker should be
+        visible. For this reason, GitHub's annotations "Issue #n" and
+        "Fixed #n" are added to the commit messages.
+       </p>
+      </li>
+      <li>
+       <p>
+        Revisiting the history between Genode releases should clearly reveal the
+        changes that potentially interest the users. I.e., when writing the
+        quarterly release notes, the Genode developers go through the history and
+        base the release-notes documentation on
+        the information contained in the commit messages. This works best if each
+        topic is comprised by a few commits with meaningful descriptions. This
+        becomes hard if the history contains too many details.
+       </p>
+      </li>
+      <li>
+       <p>
+        Each commit should represent a kind of "transaction" that can be reviewed
+        independently without knowing too much context. This is hardly possible if
+        intermediate steps that subsequently touch the same code are present as
+        individual commits.
+       </p>
+      </li>
+      <li>
+       <p>
+        It should be easy to selectively revert individual topics/features using git
+        revert (e.g., when trouble-shooting). This is simple when each topic is
+        represented by one or just a few commits.
+       </p>
+      </li>
+     </ul>
+    <h4>
+    <a id="Coding_conventions"></a>
+    Coding conventions</h4>
+     <p>
+      Genode's source code follows time-tested conventions regarding the
+      coding style and code pattern, which are important to follow. The coding style
+      is described in the following document:
+     </p>
+     <div><dl>
+      <dt>Coding-style Guidelines</dt>
+      <dd>
+       <p>
+        <a href="http://genode.org/documentation/developer-resources/coding_style">http://genode.org/documentation/developer-resources/coding_style</a>
+       </p>
+      </dd>
+     </dl></div>
+    <h4>
+    <a id="Writing_a_commit_message"></a>
+    Writing a commit message</h4>
+     <p>
+      Commit messages should adhere the following convention.
+      The first line summarizes the commit using not more than 50 characters.
+      This line will be displayed by various tools. So it should express the basic
+      topic and eventually refer to an issue. For example:
+     </p>
+<pre>
+ Add sanity checks in tool/tool_chain, fix #62
+</pre>
+     <p>
+      If the patch refers to an existing issue, add a reference to the
+      corresponding issue. If not, please consider opening an issue first. In the
+      case the patch is supposed to close an existing issue, add this information
+      using GitHub's conventions, e.g., by stating "Fix #45" in your commit
+      message, the issue will be closed automatically, by stating "Issue #45", the
+      commit will be displayed in the stream of discussion of the corresponding
+      issue.
+     </p>
+     <p>
+      After a blank line, a description of the patch follows. The description should
+      consider the following questions:
+     </p>
+     <ul>
+      <li>
+       <p>
+        Why is the patch needed?
+       </p>
+      </li>
+      <li>
+       <p>
+        How does the patch achieve the goal?
+       </p>
+      </li>
+      <li>
+       <p>
+        What are known consequences of this patch? Will it break API compatibility,
+        or produce a follow-up issue?
+       </p>
+      </li>
+     </ul>
+     <p>
+      Reconsider the documentation related to your patch: If the commit message
+      contains important information not present in the source code, this
+      information should better be placed into the code or the accompanied
+      documentation (e.g., in the form of a README file).
+     </p>
+   </div>
+</body>
+</html>
