@@ -7,3 +7,5 @@ before_install:
     - sudo apt-get install -y -qq curl expect libxml2-utils
 
 script: ./travis.sh
+
+group: deprecated-2017Q3
