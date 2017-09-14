@@ -11,6 +11,7 @@ sudo tar -xf genode-toolchain-17.05-x86_64.tar.xz -C /
 
 # Create build directory
 ./tool/create_builddir x86_64 BUILD_DIR=build
+echo 'REPOSITORIES += $(GENODE_DIR)/repos/ports' >> ./build/etc/build.conf
 
 # Run all tests
 KERNEL=linux make -C build run/noux_fork
