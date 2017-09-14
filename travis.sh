@@ -13,4 +13,4 @@ sudo tar -xf genode-toolchain-17.05-x86_64.tar.xz -C /
 ./tool/create_builddir x86_64 BUILD_DIR=build
 
 # Run all tests
-KERNEL=linux make -C build run/init
+KERNEL=linux make -C build run/noux_fork
