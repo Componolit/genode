@@ -1111,7 +1111,7 @@ int Libc::Vfs_plugin::rename(char const *from_path, char const *to_path)
 void *Libc::Vfs_plugin::mmap(void *addr_in, ::size_t length, int prot, int flags,
                              Libc::File_descriptor *fd, ::off_t offset)
 {
-	if (prot != PROT_READ) {
+	if (prot & ~(PROT_READ|PROT_WRITE)) {
 		Genode::error("mmap for prot=", Genode::Hex(prot), " not supported");
 		errno = EACCES;
 		return (void *)-1;
