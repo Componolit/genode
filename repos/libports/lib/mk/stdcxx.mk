@@ -16,7 +16,6 @@ SRC_CC  += new_op.cc new_opnt.cc new_opv.cc new_opvnt.cc new_handler.cc
 SRC_CC  += del_op.cc del_opnt.cc del_ops.cc del_opv.cc del_opvnt.cc del_opvs.cc
 SRC_CC  += bad_array_length.cc bad_array_new.cc bad_cast.cc bad_alloc.cc bad_typeid.cc
 SRC_CC  += eh_aux_runtime.cc hash_bytes.cc
-SRC_CC  += eh_ptr.cc eh_unex_handler.cc eh_terminate.cc eh_term_handler.cc vterminate.cc fundamental_type_info.cc
 SRC_CC  += tinfo.cc
 INC_DIR += $(STDCXX_DIR)/libsupc++
 

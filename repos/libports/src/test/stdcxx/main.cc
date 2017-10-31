@@ -67,8 +67,18 @@ static void test_stdexcept()
 
 static void test_lock_guard()
 {
-	std::mutex lock;
-	std::lock_guard<std::mutex> lock_guard(lock);
+#if 0
+	typedef std::mutex Mutex;
+#else
+	struct Mutex
+	{
+		void lock() { }
+		void unlock() { }
+	};
+#endif
+
+	Mutex                  lock;
+	std::lock_guard<Mutex> lock_guard(lock);
 }
 
 
