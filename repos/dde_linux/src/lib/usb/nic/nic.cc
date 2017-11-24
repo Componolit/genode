@@ -146,7 +146,7 @@ class Nic_device : public Usb_nic::Device
 		struct net_device *_ndev;  /* Linux-net device */
 		fixup_t            _tx_fixup;
 		bool const         _burst;
-		bool               _has_link { false };
+		bool               _has_link { true };
 
 	public:
 
