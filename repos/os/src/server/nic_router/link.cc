@@ -18,7 +18,7 @@
 #include <link.h>
 #include <interface.h>
 #include <configuration.h>
-#include <protocol_name.h>
+#include <l3_protocol.h>
 
 using namespace Net;
 using namespace Genode;
@@ -117,14 +117,14 @@ Link::Link(Interface                           &cln_interface,
            Link_side_id                  const &srv_id,
            Timer::Connection                   &timer,
            Configuration                       &config,
-           uint8_t                       const  protocol)
+           L3_protocol                   const  protocol)
 :
 	_config(config),
 	_client(cln_interface, cln_id, *this),
 	_server_port_alloc(srv_port_alloc),
 	_server(srv_interface, srv_id, *this),
 	_close_timeout(timer, *this, &Link::_handle_close_timeout),
-	_close_timeout_us(_config.rtt_sec() * 2 * 1000 * 1000),
+	_close_timeout_us(_config.rtt()),
 	_protocol(protocol)
 {
 	_close_timeout.schedule(_close_timeout_us);
@@ -143,12 +143,12 @@ void Link::dissolve()
 	_client._interface.dissolve_link(_client, _protocol);
 	_server._interface.dissolve_link(_server, _protocol);
 	if (_config.verbose()) {
-		log("Dissolve ", protocol_name(_protocol), " link: ", *this); }
+		log("Dissolve ", l3_protocol_name(_protocol), " link: ", *this); }
 
 	try {
 		_server_port_alloc.deref().free(_server.dst_port());
 		if (_config.verbose()) {
-			log("Free ", protocol_name(_protocol),
+			log("Free ", l3_protocol_name(_protocol),
 			    " port ", _server.dst_port(),
 			    " at ", _server.interface(),
 			    " that was used by ", _client.interface());
@@ -169,7 +169,7 @@ Tcp_link::Tcp_link(Interface                           &cln_interface,
                    Link_side_id                  const &srv_id,
                    Timer::Connection                   &timer,
                    Configuration                       &config,
-                   uint8_t                       const  protocol)
+                   L3_protocol                   const  protocol)
 :
 	Link(cln_interface, cln_id, srv_port_alloc, srv_interface, srv_id, timer,
 	     config, protocol)
@@ -230,7 +230,7 @@ Udp_link::Udp_link(Interface                           &cln_interface,
                    Link_side_id                  const &srv_id,
                    Timer::Connection                   &timer,
                    Configuration                       &config,
-                   uint8_t                       const  protocol)
+                   L3_protocol                   const  protocol)
 :
 	Link(cln_interface, cln_id, srv_port_alloc, srv_interface, srv_id, timer,
 	     config, protocol)

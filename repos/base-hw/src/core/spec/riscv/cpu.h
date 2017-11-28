@@ -19,6 +19,12 @@
 #include <cpu/cpu_state.h>
 #include <util/register.h>
 
+#include <base/internal/align_at.h>
+
+#include <kernel/interface.h>
+#include <hw/spec/riscv/cpu.h>
+
+namespace Kernel { struct Thread_fault; }
 
 namespace Genode
 {
@@ -32,87 +38,23 @@ namespace Genode
 
 namespace Kernel { class Pd; }
 
-class Genode::Cpu
+class Genode::Cpu : public Hw::Riscv_cpu
 {
 	public:
 
-		static constexpr addr_t mtc_size = 0x1000;
-		static constexpr addr_t exception_entry = (~0ULL) & ~(0xfff);
-
-		/**
-		 * Extend basic CPU state by members relevant for 'base-hw' only
-		 */
-		struct Context : Cpu_state
+		struct alignas(8) Context : Cpu_state
 		{
-			struct Sptbr : Register<64>
-			{
-				struct Ppn  : Bitfield<0, 38> { };
-				struct Asid : Bitfield<38, 26> { };
-			};
+			Context(bool);
+		};
 
+		struct Mmu_context
+		{
 			Sptbr::access_t sptbr;
 
-			/**
-			 * Return base of assigned translation table
-			 */
-			addr_t translation_table() const { return Sptbr::Ppn::get(sptbr) << 12; }
-
-			/**
-			 * Assign translation-table base 'table'
-			 */
-			void translation_table(addr_t const table) { Sptbr::Ppn::set(sptbr, table >> 12); }
-
-			/**
-			 * Assign protection domain
-			 */
-			void protection_domain(Genode::uint8_t const id) { Sptbr::Asid::set(sptbr, id); }
+			Mmu_context(addr_t page_table_base);
+			~Mmu_context();
 		};
 
-		struct Pd
-		{
-			Genode::uint8_t asid; /* address space id */
-
-			Pd(Genode::uint8_t id) : asid(id) {}
-		};
-
-		/**
-		 * A usermode execution state
-		 */
-		struct User_context : Context
-		{
-			/**
-			 * Constructor
-			 */
-			User_context();
-
-			/**
-			 * Support for kernel calls
-			 */
-			void user_arg_0(Kernel::Call_arg const arg) { a0  = arg; }
-			void user_arg_1(Kernel::Call_arg const arg) { a1  = arg; }
-			void user_arg_2(Kernel::Call_arg const arg) { a2  = arg; }
-			void user_arg_3(Kernel::Call_arg const arg) { a3  = arg; }
-			void user_arg_4(Kernel::Call_arg const arg) { a4  = arg; }
-			Kernel::Call_arg user_arg_0() const { return a0; }
-			Kernel::Call_arg user_arg_1() const { return a1; }
-			Kernel::Call_arg user_arg_2() const { return a2; }
-			Kernel::Call_arg user_arg_3() const { return a3; }
-			Kernel::Call_arg user_arg_4() const { return a4; }
-
-			/**
-			 * Initialize thread context
-			 *
-			 * \param table  physical base of appropriate translation table
-			 * \param pd_id  kernel name of appropriate protection domain
-			 */
-			void init_thread(addr_t const table, unsigned const pd_id)
-			{
-				protection_domain(pd_id);
-				translation_table(table);
-			}
-		};
-
-		static void wait_for_interrupt() { asm volatile ("wfi"); };
 
 		/**
 		 * From the manual
@@ -133,38 +75,13 @@ class Genode::Cpu
 			asm volatile ("sfence.vm\n");
 		}
 
-		/**
-		 * Post processing after a translation was added to a translation table
-		 *
-		 * \param addr  virtual address of the translation
-		 * \param size  size of the translation
-		 */
-		static void translation_added(addr_t const addr, size_t const size);
-
 		static void invalidate_tlb_by_pid(unsigned const pid) { sfence(); }
 
-		/**
-		 * Return kernel name of the executing CPU
-		 */
-		static unsigned executing_id() { return primary_id(); }
+		void switch_to(Mmu_context & context);
+		static void mmu_fault(Context & c, Kernel::Thread_fault & f);
 
-		/**
-		 * Return kernel name of the primary CPU
-		 */
-		static unsigned primary_id() { return 0; }
-
-		static addr_t sbadaddr()
-		{
-			addr_t addr;
-			asm volatile ("csrr %0, sbadaddr\n" : "=r"(addr));
-			return addr;
-		}
-
-		/*************
-		 ** Dummies **
-		 *************/
-
-		void switch_to(User_context&) { }
+		static unsigned executing_id() { return 0; }
+		static unsigned primary_id()   { return 0; }
 };
 
 #endif /* _CORE__SPEC__RISCV__CPU_H_ */

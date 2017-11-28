@@ -25,11 +25,7 @@ one of the following filters:
 
   It may contain any number of '<key>' nodes. Each of those key nodes has
   the key name as 'name' attribute, may feature an optional 'to' attribute
-  with the name of the key that should be reported instead of 'name', and
-  an optional 'sticky' attribute. If the latter is set to "yes", the key
-  behaves like a sticky key. That means, only press events are evaluated
-  and every second press event is reported as a release event. This is
-  useful for special keys like capslock.
+  with the name of the key that should be reported instead of 'name'.
 
 :<merge>:
 
@@ -40,6 +36,33 @@ one of the following filters:
   Supplements the input-event stream of another filter with artificial
   'CHARACTER' events by applying character mapping rules. The originating
   filter is defined as a child node.
+
+:<button-scroll>:
+
+  Turns relative motion events into wheel events while a special button
+  (i.e., the middle mouse button) is pressed. The button and rate of generated
+  wheel events can be configured per axis via the sub nodes '<vertical>' and
+  '<horizontal>'. The button of each axis can be specified via the 'button'
+  attribute. By default, "BTN_MIDDLE" is used. The rate of generated wheel
+  events can be defined by the 'speed_percent' attribute. A value of "100"
+  uses relative motion vectors directly as wheel motion vectors. In practice,
+  this is results in overly fast wheel motion. By lowering the value, the rate
+  can be reduced to practical levels. By specifying a negative value, the
+  direction of the generated wheel motion can be inverted.
+
+  The consumed relative motion events are filtered out from the event stream
+  such that pointer movements are inhibited while the wheel emulation is
+  active. All other events are passed along unmodified.
+
+:<accelerate>:
+
+  Applies acceleration to relative motion values. The 'max' attribute
+  defines the maximum value added to the incoming motion values. The
+  'sensitivity_percent' attribute scales incoming motion values before
+  applying the (potentially non-linear) acceleration function. The 'curve'
+  attribute defines the degree of non-linearity of the acceleration. The value
+  "0" corresponds to a linear function whereas the maximum value "255" applies
+  a curved function. The default value is "127".
 
 
 Character generator rules
@@ -57,7 +80,13 @@ sub nodes:
 
   ! <mod1>
   !   <key name="KEY_LEFTSHIFT"/> <key name="KEY_RIGHTSHIFT"/>
+  !   <rom name="capslock"/>
   ! </mod1>
+
+  The '<rom>' node incorporates the content of the ROM module of the
+  specified name into the modifier state. If the ROM module contains a
+  top-level node with the attribute 'enabled' set to "yes", the modifier
+  is enabled. This is useful for handling a system-global capslock state.
 
 :<map mod1="..." mod2="..." mod3="..." mod4="...">:
 

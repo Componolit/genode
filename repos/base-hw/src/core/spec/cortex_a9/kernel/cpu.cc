@@ -14,22 +14,15 @@
 /* core includes */
 #include <kernel/perf_counter.h>
 #include <kernel/lock.h>
+#include <kernel/cpu.h>
 #include <kernel/pd.h>
 #include <pic.h>
 #include <platform_pd.h>
 #include <platform.h>
 
-extern int _mt_begin;
-extern int _mt_master_context_begin;
-
 
 void Kernel::Cpu::init(Kernel::Pic &pic)
 {
-	Cpu_context * c = (Cpu_context*)
-		(Cpu::exception_entry + ((addr_t)&_mt_master_context_begin -
-		                         (addr_t)&_mt_begin));
-	c->cpu_exception = Genode::Cpu::Ttbr0::read();
-
 	_fpu.init();
 
 	{

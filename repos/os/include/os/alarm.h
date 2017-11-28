@@ -32,18 +32,34 @@ class Genode::Alarm
 
 		friend class Alarm_scheduler;
 
+		struct Raw
+		{
+			Time deadline;       /* next deadline                */
+			bool deadline_period;
+			Time period;         /* duration between alarms      */
+
+			bool is_pending_at(unsigned long time, bool time_period) const;
+		};
+
 		Lock             _dispatch_lock;  /* taken during handle method   */
-		Time             _deadline;       /* next deadline                */
-		Time             _period;         /* duration between alarms      */
+		Raw              _raw;
 		int              _active;         /* set to one when active       */
 		Alarm           *_next;           /* next alarm in alarm list     */
 		Alarm_scheduler *_scheduler;      /* currently assigned scheduler */
 
-		void _assign(Time period, Time deadline, Alarm_scheduler *scheduler) {
-			_period = period, _deadline = deadline, _scheduler = scheduler; }
+		void _assign(Time             period,
+		             Time             deadline,
+		             bool             deadline_period,
+		             Alarm_scheduler *scheduler)
+		{
+			_raw.period          = period;
+			_raw.deadline_period = deadline_period;
+			_raw.deadline        = deadline;
+			_scheduler           = scheduler;
+		}
 
 		void _reset() {
-			_assign(0, 0, 0), _active = 0, _next = 0; }
+			_assign(0, 0, false, 0), _active = 0, _next = 0; }
 
 	protected:
 
@@ -68,9 +84,11 @@ class Genode::Alarm_scheduler
 {
 	private:
 
-		Lock         _lock;   /* protect alarm list                     */
-		Alarm       *_head;   /* head of alarm list                     */
-		Alarm::Time  _now;    /* recent time (updated by handle method) */
+		Lock         _lock;                   /* protect alarm list                     */
+		Alarm       *_head       { nullptr }; /* head of alarm list                     */
+		Alarm::Time  _now        { 0UL };     /* recent time (updated by handle method) */
+		bool         _now_period { false };
+		Alarm::Raw   _min_handle_period;
 
 		/**
 		 * Enqueue alarm into alarm queue
@@ -99,7 +117,15 @@ class Genode::Alarm_scheduler
 
 	public:
 
-		Alarm_scheduler() : _head(0), _now(0) { }
+		Alarm_scheduler(Alarm::Time min_handle_period = 1)
+		{
+			Alarm::Time const deadline         = _now + min_handle_period;
+			_min_handle_period.period          = min_handle_period;
+			_min_handle_period.deadline        = deadline;
+			_min_handle_period.deadline_period = _now > deadline ?
+			                                     !_now_period : _now_period;
+		}
+
 		~Alarm_scheduler();
 
 		/**

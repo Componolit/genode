@@ -18,10 +18,10 @@ SRC_CC += spec/arm_v7/vm_session_component.cc
 SRC_CC += spec/arm_v7/trustzone/vm_session_component.cc
 SRC_CC += spec/imx53/pic.cc
 SRC_CC += spec/imx53/timer.cc
-SRC_CC += spec/arm/cpu_context_trustzone.cc
+SRC_CC += spec/arm/cpu_trustzone.cc
 
 # add assembly sources
-SRC_S += spec/arm_v7/trustzone/mode_transition.s
+SRC_S += spec/arm_v7/trustzone/exception_vector.s
 
 # include less specific configuration
 include $(REP_DIR)/lib/mk/spec/cortex_a8/core-hw.inc

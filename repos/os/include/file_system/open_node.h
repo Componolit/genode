@@ -32,10 +32,10 @@ class File_system::Open_node : public File_system::Node
 
 		Genode::Id_space<File_system::Node>::Element _element;
 
-		NODE                                         &_node;
-		Genode::Constructible<File_system::Listener>  _listener;
+		Genode::Weak_ptr<NODE>                       _node;
+		Genode::Constructible<File_system::Listener> _listener;
 
-		Listener::Version const _version_when_opened = _node.curr_version();
+		Listener::Version const _version_when_opened { _node_version(_node) };
 
 		/*
 		 * Flag to track whether the underlying file-system node was
@@ -44,15 +44,29 @@ class File_system::Open_node : public File_system::Node
 		 */
 		bool _was_written = false;
 
+		static Listener::Version const _node_version(Genode::Weak_ptr<NODE> node)
+		{
+			Genode::Locked_ptr<NODE> locked_node { node };
+
+			if (locked_node.valid())
+				return locked_node->curr_version();
+			else
+				return Listener::Version { 0 };
+		}
+
 	public:
 
-		Open_node(NODE &node, Genode::Id_space<File_system::Node> &id_space)
+		Open_node(Genode::Weak_ptr<NODE> node,
+		          Genode::Id_space<File_system::Node> &id_space)
 		: _element(*this, id_space), _node(node) { }
 
 		~Open_node()
 		{
+			Genode::Locked_ptr<NODE> node { _node };
+
 			if (_listener.constructed()) {
-				_node.remove_listener(&*_listener);
+				if (node.valid())
+					node->remove_listener(&*_listener);
 				_listener.destruct();
 			}
 
@@ -60,10 +74,11 @@ class File_system::Open_node : public File_system::Node
 			 * Notify remaining listeners about the changed file
 			 */
 			if (_was_written)
-				_node.notify_listeners();
+				if (node.valid())
+					node->notify_listeners();
 		}
 
-		NODE                  &node()     { return _node; }
+		Genode::Weak_ptr<NODE>&node()     { return _node; }
 		File_system::Listener &listener() { return *_listener; }
 
 		Genode::Id_space<File_system::Node>::Id id() { return _element.id(); }
@@ -73,20 +88,25 @@ class File_system::Open_node : public File_system::Node
 		 */
 		void register_notify(File_system::Sink &sink)
 		{
+			Genode::Locked_ptr<NODE> node { _node };
+
 			/*
 			 * If there was already a handler registered for the node,
 			 * remove the old handler.
 			 */
 			if (_listener.constructed()) {
-				_node.remove_listener(&*_listener);
+				if (node.valid())
+					node->remove_listener(&*_listener);
 				_listener.destruct();
 			}
 
 			/*
 			 * Register new handler
 			 */
-			_listener.construct(sink, id(), _version_when_opened);
-			_node.add_listener(&*_listener);
+			if (node.valid()) {
+				_listener.construct(sink, id(), _version_when_opened);
+				node->add_listener(&*_listener);
+			}
 		}
 
 		void mark_as_written() { _was_written = true; }

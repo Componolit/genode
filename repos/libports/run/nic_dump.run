@@ -178,7 +178,7 @@ append config {
 	<start name="nic_router" caps="200">
 		<resource name="RAM" quantum="10M"/>
 		<provides><service name="Nic"/></provides>
-		<config rtt_sec="3" verbose="no">
+		<config rtt_sec="6" verbose="no">
 
 			<policy label_prefix="udp_client_1"  domain="udp_client_1"  />
 			<policy label_prefix="http_client_3" domain="http_client_3" />
@@ -253,7 +253,7 @@ install_config $config
 
 build_boot_image "
 	core init timer nic_router nic_bridge ld.lib.so libc.lib.so libm.lib.so
-	posix.lib.so libc_resolv.lib.so lwip.lib.so lxip.lib.so test-http_clnt
+	posix.lib.so lwip.lib.so lxip.lib.so test-http_clnt
 	test-lwip_httpsrv_static nic_dump test-lxip_udp_echo test-lxip_udp_client
 	[nic_drv_binary] [gpio_drv] [platform_drv_boot_modules]"
 
@@ -263,4 +263,4 @@ proc nic_qemu_args { } {
 
 append qemu_args "-nographic -net user [nic_qemu_args]"
 
-run_genode_until {.*Test done.*\n.*Test done.*\n} 60
+run_genode_until {.*Test done.*\n.*Test done.*\n} 120

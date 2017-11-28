@@ -21,10 +21,12 @@
 #include <ip_rule.h>
 #include <port_allocator.h>
 #include <pointer.h>
+#include <ipv4_config.h>
+#include <dhcp_server.h>
 
 /* Genode includes */
 #include <util/avl_string.h>
-#include <util/xml_node.h>
+#include <util/reconstructible.h>
 
 namespace Genode { class Allocator; }
 
@@ -74,22 +76,21 @@ class Net::Domain : public Domain_base
 {
 	private:
 
-		Domain_avl_member       _avl_member;
-		Configuration          &_config;
-		Genode::Xml_node        _node;
-		Genode::Allocator      &_alloc;
-		Ipv4_address_prefix     _interface_attr;
-		Ipv4_address const      _gateway;
-		bool         const      _gateway_valid;
-		Ip_rule_list            _ip_rules;
-		Forward_rule_tree       _tcp_forward_rules;
-		Forward_rule_tree       _udp_forward_rules;
-		Transport_rule_list     _tcp_rules;
-		Transport_rule_list     _udp_rules;
-		Port_allocator          _tcp_port_alloc;
-		Port_allocator          _udp_port_alloc;
-		Nat_rule_tree           _nat_rules;
-		Pointer<Interface>      _interface;
+		Domain_avl_member                     _avl_member;
+		Configuration                        &_config;
+		Genode::Xml_node                      _node;
+		Genode::Allocator                    &_alloc;
+		Ip_rule_list                          _ip_rules;
+		Forward_rule_tree                     _tcp_forward_rules;
+		Forward_rule_tree                     _udp_forward_rules;
+		Transport_rule_list                   _tcp_rules;
+		Transport_rule_list                   _udp_rules;
+		Port_allocator                        _tcp_port_alloc;
+		Port_allocator                        _udp_port_alloc;
+		Nat_rule_tree                         _nat_rules;
+		Pointer<Interface>                    _interface;
+		Pointer<Dhcp_server>                  _dhcp_server;
+		Genode::Reconstructible<Ipv4_config>  _ip_config;
 
 		void _read_forward_rules(Genode::Cstring  const &protocol,
 		                         Domain_tree            &domains,
@@ -103,6 +104,8 @@ class Net::Domain : public Domain_base
 		                           char             const *type,
 		                           Transport_rule_list    &rules);
 
+		void _ip_config_changed();
+
 	public:
 
 		struct Invalid     : Genode::Exception { };
@@ -112,9 +115,17 @@ class Net::Domain : public Domain_base
 		       Genode::Xml_node const  node,
 		       Genode::Allocator      &alloc);
 
+		~Domain();
+
 		void create_rules(Domain_tree &domains);
 
 		Ipv4_address const &next_hop(Ipv4_address const &ip) const;
+
+		void ip_config(Ipv4_address ip,
+		               Ipv4_address subnet_mask,
+		               Ipv4_address gateway);
+
+		void discard_ip_config();
 
 
 		/*********
@@ -128,17 +139,18 @@ class Net::Domain : public Domain_base
 		 ** Accessors **
 		 ***************/
 
-		Domain_name const   &name()              { return _name; }
-		Ip_rule_list        &ip_rules()          { return _ip_rules; }
-		Forward_rule_tree   &tcp_forward_rules() { return _tcp_forward_rules; }
-		Forward_rule_tree   &udp_forward_rules() { return _udp_forward_rules; }
-		Transport_rule_list &tcp_rules()         { return _tcp_rules; }
-		Transport_rule_list &udp_rules()         { return _udp_rules; }
-		Nat_rule_tree       &nat_rules()         { return _nat_rules; }
-		Ipv4_address_prefix &interface_attr()    { return _interface_attr; }
-		Pointer<Interface>  &interface()         { return _interface; }
-		Configuration       &config() const      { return _config; }
-		Domain_avl_member   &avl_member()        { return _avl_member; }
+		Ipv4_config   const &ip_config()     const { return *_ip_config; }
+		Domain_name   const &name()                { return _name; }
+		Ip_rule_list        &ip_rules()            { return _ip_rules; }
+		Forward_rule_tree   &tcp_forward_rules()   { return _tcp_forward_rules; }
+		Forward_rule_tree   &udp_forward_rules()   { return _udp_forward_rules; }
+		Transport_rule_list &tcp_rules()           { return _tcp_rules; }
+		Transport_rule_list &udp_rules()           { return _udp_rules; }
+		Nat_rule_tree       &nat_rules()           { return _nat_rules; }
+		Pointer<Interface>  &interface()           { return _interface; }
+		Configuration       &config()        const { return _config; }
+		Domain_avl_member   &avl_member()          { return _avl_member; }
+		Dhcp_server         &dhcp_server()         { return _dhcp_server.deref(); }
 };
 
 

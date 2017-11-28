@@ -240,6 +240,8 @@ class Hw::Long_translation_table
 
 			struct Privileged_execute_never : Base::template Bitfield<53,1> { };
 
+			struct Execute_never : Base::template Bitfield<54,1> { };
+
 			static typename Descriptor::access_t create(Page_flags const &f,
 			                                            addr_t const pa)
 			{
@@ -250,7 +252,8 @@ class Hw::Long_translation_table
 						Base::Shareability::OUTER_SHAREABLE)
 					| Base::Output_address::masked(pa)
 					| Base::Access_flag::bits(1)
-					| Descriptor::Valid::bits(1);
+					| Descriptor::Valid::bits(1)
+					| Execute_never::bits(!f.executable);
 			}
 		};
 
@@ -530,5 +533,13 @@ struct Hw::Page_table : Level_1_stage_1_translation_table
 		                          CORE_LEVEL_2_TT_COUNT *
 		                          TABLE_LEVEL_X_ENTRIES,
 	};
+
+	Page_table() : Level_1_stage_1_translation_table() { }
+
+	/**
+	 * On ARM we do not need to copy top-level kernel entries
+	 * because the virtual-memory kernel part is hold in a separate table
+	 */
+	explicit Page_table(Page_table &o) : Level_1_stage_1_translation_table() { }
 };
 #endif /* _SRC__LIB__HW__SPEC__ARM__LPAE_H_ */

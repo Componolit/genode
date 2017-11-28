@@ -74,19 +74,7 @@ Net::Session_component::Session_component(Allocator         &alloc,
 	_tx.sigh_packet_avail(_sink_submit);
 	_rx.sigh_ack_avail(_source_ack);
 	_rx.sigh_ready_to_submit(_source_submit);
-}
-
-
-bool Session_component::link_state()
-{
-	warning("Session_component::link_state not implemented");
-	return false;
-}
-
-
-void Session_component::link_state_sigh(Signal_context_capability sigh)
-{
-	warning("Session_component::link_state_sigh not implemented");
+	Interface::_init();
 }
 
 

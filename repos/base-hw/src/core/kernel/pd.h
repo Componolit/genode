@@ -16,7 +16,9 @@
 #define _CORE__KERNEL__PD_H_
 
 /* core includes */
-#include <kernel/cpu.h>
+#include <hw/assert.h>
+#include <cpu.h>
+#include <kernel/core_interface.h>
 #include <kernel/object.h>
 #include <translation_table.h>
 
@@ -27,66 +29,13 @@ namespace Genode {
 namespace Kernel
 {
 	/**
-	 * Controls the mode-transition page
-	 *
-	 * The mode transition page is a small memory region that is mapped by
-	 * every PD to the same virtual address. It contains code that acts as a
-	 * link between high privileged CPU mode (often called kernel) and low
-	 * privileged CPU mode (often called userland). The mode transition
-	 * control provides a simple interface to access the code from within
-	 * the kernel.
-	 */
-	struct Mode_transition_control;
-
-	/**
-	 * Return the system wide mode-transition control
-	 */
-	Mode_transition_control * mtc();
-
-	/**
 	 * Kernel backend of protection domains
 	 */
 	class Pd;
 }
 
 
-struct Kernel::Mode_transition_control
-{
-	/**
-	 * Map the mode transition page to a virtual address space
-	 *
-	 * \param tt     translation buffer of the address space
-	 * \param alloc  translation table allocator used for the mapping
-	 */
-	void map(Hw::Page_table & tt,
-	         Hw::Page_table::Allocator & alloc);
-
-	/**
-	 * Continue execution of client context
-	 *
-	 * \param context           targeted CPU context
-	 * \param cpu               kernel name of targeted CPU
-	 * \param entry_raw         raw pointer to assembly entry-code
-	 * \param context_ptr_base  base address of client-context pointer region
-	 */
-	void switch_to(Cpu::Context * const context,
-	               unsigned const cpu,
-	               addr_t const entry_raw,
-	               addr_t const context_ptr_base);
-
-	/**
-	 * Continue execution of user context
-	 *
-	 * \param context           targeted CPU context
-	 * \param cpu               kernel name of targeted CPU
-	 */
-	 void switch_to_user(Cpu::Context * const context,
-	                     unsigned const cpu);
-};
-
-
-class Kernel::Pd : public Cpu::Pd,
-                   public Kernel::Object
+class Kernel::Pd : public Kernel::Object
 {
 	public:
 
@@ -103,6 +52,8 @@ class Kernel::Pd : public Cpu::Pd,
 
 	public:
 
+		Genode::Cpu::Mmu_context        mmu_regs;
+
 		/**
 		 * Constructor
 		 *
@@ -110,14 +61,19 @@ class Kernel::Pd : public Cpu::Pd,
 		 * \param platform_pd  core object of the PD
 		 */
 		Pd(Hw::Page_table * const table,
-		   Genode::Platform_pd * const platform_pd);
+		   Genode::Platform_pd * const platform_pd)
+		: _table(table), _platform_pd(platform_pd),
+		  mmu_regs((addr_t)table)
+		{
+			capid_t invalid = _capid_alloc.alloc();
+			assert(invalid == cap_id_invalid());
+		}
 
-		~Pd();
-
-		/**
-		 * Let the CPU context 'c' join the PD
-		 */
-		void admit(Cpu::Context * const c);
+		~Pd()
+		{
+			while (Object_identity_reference *oir = _cap_tree.first())
+				oir->~Object_identity_reference();
+		}
 
 
 		static capid_t syscall_create(void * const dst,
@@ -130,6 +86,7 @@ class Kernel::Pd : public Cpu::Pd,
 
 		static void syscall_destroy(Pd * const pd) {
 			call(call_id_delete_pd(), (Call_arg)pd); }
+
 
 		/***************
 		 ** Accessors **

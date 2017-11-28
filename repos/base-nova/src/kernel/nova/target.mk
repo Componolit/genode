@@ -7,7 +7,7 @@ NOVA_SRC_DIR     = $(call select_from_ports,nova)/src/kernel/nova
 SRC_CC           = $(sort $(notdir $(wildcard $(NOVA_SRC_DIR)/src/*.cpp)))
 SRC_S            = $(sort $(notdir $(wildcard $(NOVA_SRC_DIR)/src/*.S)))
 INC_DIR          = $(NOVA_SRC_DIR)/include
-CC_OLEVEL        = -Os
+override CC_OLEVEL := -Os
 CC_WARN          = -Wall -Wextra -Waggregate-return -Wcast-align -Wcast-qual \
                    -Wconversion -Wdisabled-optimization -Wformat=2 \
                    -Wmissing-format-attribute -Wmissing-noreturn -Wpacked \
@@ -23,11 +23,13 @@ CC_OPT          += -pipe \
                    -fno-asynchronous-unwind-tables -std=gnu++0x 
 CC_OPT_PIC      :=
 ifeq ($(filter-out $(SPECS),32bit),)
+override CC_MARCH = -m32
 CC_WARN         += -Wframe-larger-than=96
 CC_OPT          += -mpreferred-stack-boundary=2 -mregparm=3
 else
 ifeq ($(filter-out $(SPECS),64bit),)
-CC_WARN         += -Wframe-larger-than=240
+override CC_MARCH = -m64
+CC_WARN         += -Wframe-larger-than=256
 CC_OPT          += -mpreferred-stack-boundary=4 -mcmodel=kernel -mno-red-zone
 else
 $(error Unsupported environment)

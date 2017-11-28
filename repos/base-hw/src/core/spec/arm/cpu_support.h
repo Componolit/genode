@@ -18,6 +18,7 @@
 /* Genode includes */
 #include <util/register.h>
 #include <cpu/cpu_state.h>
+#include <base/internal/align_at.h>
 
 #include <hw/spec/arm/cpu.h>
 
@@ -27,6 +28,8 @@
 #include <board.h>
 #include <util.h>
 
+namespace Kernel { struct Thread_fault; }
+
 namespace Genode {
 	using sizet_arithm_t = Genode::uint64_t;
 	struct Arm_cpu;
@@ -34,9 +37,6 @@ namespace Genode {
 
 struct Genode::Arm_cpu : public Hw::Arm_cpu
 {
-	static constexpr addr_t exception_entry   = 0xffff0000;
-	static constexpr addr_t mtc_size          = get_page_size();
-
 	/**
 	 * Translation table base register 0
 	 */
@@ -60,129 +60,23 @@ struct Genode::Arm_cpu : public Hw::Arm_cpu
 		}
 	};
 
-	struct Dfsr : Hw::Arm_cpu::Dfsr
+	struct alignas(4) Context : Cpu_state
 	{
-		struct Wnr : Bitfield<11, 1> { }; /* write not read bit */
-	};
-
-	/**
-	 * Extend basic CPU state by members relevant for 'base-hw' only
-	 */
-	struct Context : Cpu_state
-	{
-		Cidr::access_t  cidr;
-		Ttbr0::access_t ttbr0;
-
-		/**
-		 * Return base of assigned translation table
-		 */
-		addr_t translation_table() const {
-			return Ttbr::Ba::masked(ttbr0); }
-
-
-		/**
-		 * Assign translation-table base 'table'
-		 */
-		void translation_table(addr_t const table) {
-			ttbr0 = Ttbr0::init(table); }
-
-		/**
-		 * Assign protection domain
-		 */
-		void protection_domain(Genode::uint8_t const id) { cidr = id; }
+		Context(bool privileged);
 	};
 
 	/**
 	 * This class comprises ARM specific protection domain attributes
 	 */
-	struct Pd
+	struct Mmu_context
 	{
-		Genode::uint8_t asid; /* address space id */
+		Cidr::access_t  cidr;
+		Ttbr0::access_t ttbr0;
 
-		Pd(Genode::uint8_t id) : asid(id) {}
-	};
+		Mmu_context(addr_t page_table_base);
+		~Mmu_context();
 
-	/**
-	 * An usermode execution state
-	 */
-	struct User_context : Context
-	{
-		User_context();
-
-		/**
-		 * Support for kernel calls
-		 */
-		void user_arg_0(Kernel::Call_arg const arg) { r0 = arg; }
-		void user_arg_1(Kernel::Call_arg const arg) { r1 = arg; }
-		void user_arg_2(Kernel::Call_arg const arg) { r2 = arg; }
-		void user_arg_3(Kernel::Call_arg const arg) { r3 = arg; }
-		void user_arg_4(Kernel::Call_arg const arg) { r4 = arg; }
-		Kernel::Call_arg user_arg_0() const { return r0; }
-		Kernel::Call_arg user_arg_1() const { return r1; }
-		Kernel::Call_arg user_arg_2() const { return r2; }
-		Kernel::Call_arg user_arg_3() const { return r3; }
-		Kernel::Call_arg user_arg_4() const { return r4; }
-
-		/**
-		 * Initialize thread context
-		 *
-		 * \param table  physical base of appropriate translation table
-		 * \param pd_id  kernel name of appropriate protection domain
-		 */
-		void init_thread(addr_t const table, unsigned const pd_id)
-		{
-			protection_domain(pd_id);
-			translation_table(table);
-		}
-
-		/**
-		 * Return if the context is in a page fault due to translation miss
-		 *
-		 * \param va  holds the virtual fault-address if call returns 1
-		 * \param w   holds wether it's a write fault if call returns 1
-		 */
-		bool in_fault(addr_t & va, addr_t & w) const
-		{
-			/* translation fault on section */
-			static constexpr Fsr::access_t section    = 5;
-			/* translation fault on page */
-			static constexpr Fsr::access_t page       = 7;
-			/* permission fault on page */
-			static constexpr Fsr::access_t permission = 0xf;
-
-			switch (cpu_exception) {
-
-			case PREFETCH_ABORT:
-				{
-					/* check if fault was caused by a translation miss */
-					Ifsr::access_t const fs = Fsr::Fs::get(Ifsr::read());
-					if (fs != section && fs != page)
-						return false;
-
-					/* fetch fault data */
-					w = 0;
-					va = ip;
-					return true;
-				}
-			case DATA_ABORT:
-				{
-					/* check if fault is of known type */
-					Dfsr::access_t const fs = Fsr::Fs::get(Dfsr::read());
-					if (fs != permission && fs != section && fs != page)
-						return false;
-
-					/* fetch fault data */
-					Dfsr::access_t const dfsr = Dfsr::read();
-					w = Dfsr::Wnr::get(dfsr);
-					va = Dfar::read();
-					return true;
-				}
-
-			default:
-				return false;
-			};
-		}
-
+		uint8_t id() { return cidr; }
 	};
 
 	/**
@@ -234,14 +128,26 @@ struct Genode::Arm_cpu : public Hw::Arm_cpu
 		for (; base < top; base += line_size) { Icimvau::write(base); }
 	}
 
-	static void wait_for_interrupt();
+	void switch_to(Context&, Mmu_context & o)
+	{
+		if (o.cidr == 0) return;
+
+		Cidr::access_t cidr = Cidr::read();
+		if (cidr != o.cidr) {
+			Cidr::write(o.cidr);
+			Ttbr0::write(o.ttbr0);
+		}
+	}
+
+	static void mmu_fault(Context & c, Kernel::Thread_fault & fault);
+	static void mmu_fault_status(Fsr::access_t fsr,
+	                             Kernel::Thread_fault & fault);
 
 
 	/*************
 	 ** Dummies **
 	 *************/
 
-	void switch_to(User_context&) { }
 	bool retry_undefined_instr(Context&) { return false; }
 
 	/**

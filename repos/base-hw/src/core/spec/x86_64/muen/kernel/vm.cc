@@ -15,12 +15,10 @@
 
 #include <assertion.h>
 #include <platform_pd.h>
+#include <kernel/cpu.h>
 #include <kernel/vm.h>
 #include <cpu/cpu_state.h>
 #include <pic.h>
-
-extern void * _vt_vm_entry;
-extern void * _mt_client_context_ptr;
 
 Kernel::Vm::Vm(void * const state, Kernel::Signal_context * const context,
                void * const)
@@ -36,7 +34,7 @@ Kernel::Vm::Vm(void * const state, Kernel::Signal_context * const context,
 Kernel::Vm::~Vm() { }
 
 
-void Kernel::Vm::exception(unsigned const cpu_id)
+void Kernel::Vm::exception(Cpu & cpu)
 {
 	pause();
 	if (_state->trapno == 200) {
@@ -47,7 +45,7 @@ void Kernel::Vm::exception(unsigned const cpu_id)
 	if (_state->trapno >= Genode::Cpu_state::INTERRUPTS_START &&
 		_state->trapno <= Genode::Cpu_state::INTERRUPTS_END) {
 		pic()->irq_occurred(_state->trapno);
-		_interrupt(cpu_id);
+		_interrupt(cpu.id());
 		_context->submit(1);
 		return;
 	}
@@ -58,10 +56,16 @@ void Kernel::Vm::exception(unsigned const cpu_id)
 }
 
 
-void Kernel::Vm::proceed(unsigned const cpu_id)
+extern void * __tss_client_context_ptr;
+
+void Kernel::Vm::proceed(Cpu &)
 {
-	mtc()->switch_to(reinterpret_cast<Cpu::Context*>(_state), cpu_id,
-	                 (addr_t) &_vt_vm_entry, (addr_t) &_mt_client_context_ptr);
+	void * * tss_stack_ptr = (&__tss_client_context_ptr);
+	*tss_stack_ptr = (void*)((addr_t)_state + sizeof(Genode::Cpu_state));
+
+	asm volatile("sti          \n"
+	             "mov $1, %rax \n"
+	             "vmcall");
 }
 
 

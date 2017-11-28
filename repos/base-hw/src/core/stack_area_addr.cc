@@ -14,4 +14,7 @@
 /* base-internal includes */
 #include <base/internal/stack_area.h>
 
-Genode::addr_t Genode::stack_area_virtual_base() { return 0xd0000000UL; }
+#include <hw/memory_map.h>
+
+Genode::addr_t Genode::stack_area_virtual_base() {
+	return Hw::Mm::core_stack_area().base; }

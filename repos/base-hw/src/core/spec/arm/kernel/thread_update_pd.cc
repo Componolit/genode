@@ -12,6 +12,7 @@
  */
 /* core includes */
 #include <kernel/pd.h>
+#include <kernel/cpu.h>
 #include <kernel/thread.h>
 
 void Kernel::Thread::_call_update_pd()
@@ -20,5 +21,8 @@ void Kernel::Thread::_call_update_pd()
 	Cpu * const cpu = cpu_pool()->cpu(Cpu::executing_id());
 	cpu->invalidate_instr_cache();
 	cpu->clean_invalidate_data_cache();
-	Cpu::Tlbiasid::write(pd->asid); /* flush TLB by ASID */
+	if (pd->mmu_regs.id())
+		Cpu::Tlbiasid::write(pd->mmu_regs.id()); /* flush TLB by ASID */
+	else
+		Cpu::Tlbiall::write(0);
 }

@@ -26,15 +26,64 @@ void Net::Ipv4_packet::print(Genode::Output &output) const
 {
 	Genode::print(output, "\033[32mIPV4\033[0m ", src(), " > ", dst(), " ");
 	switch (protocol()) {
-	case Tcp_packet::IP_ID:
+	case Protocol::TCP:
 		Genode::print(output,
 		              *reinterpret_cast<Tcp_packet const *>(data<void>()));
 		break;
-	case Udp_packet::IP_ID:
+	case Protocol::UDP:
 		Genode::print(output,
 		              *reinterpret_cast<Udp_packet const *>(data<void>()));
 		break;
 	default: ; }
+}
+
+
+bool Ipv4_address::is_in_range(Ipv4_address const &first,
+                               Ipv4_address const &last) const
+{
+	uint32_t const ip_raw = to_uint32_little_endian();
+	return ip_raw >= first.to_uint32_little_endian() &&
+	       ip_raw <= last.to_uint32_little_endian();
+}
+
+
+uint32_t Ipv4_address::to_uint32_big_endian() const
+{
+	return addr[0] |
+	       addr[1] << 8 |
+	       addr[2] << 16 |
+	       addr[3] << 24;
+}
+
+
+Ipv4_address Ipv4_address::from_uint32_big_endian(uint32_t ip_raw)
+{
+	Ipv4_address ip;
+	ip.addr[0] = ip_raw;
+	ip.addr[1] = ip_raw >> 8;
+	ip.addr[2] = ip_raw >> 16;
+	ip.addr[3] = ip_raw >> 24;
+	return ip;
+}
+
+
+uint32_t Ipv4_address::to_uint32_little_endian() const
+{
+	return addr[3] |
+	       addr[2] << 8 |
+	       addr[1] << 16 |
+	       addr[0] << 24;
+}
+
+
+Ipv4_address Ipv4_address::from_uint32_little_endian(uint32_t ip_raw)
+{
+	Ipv4_address ip;
+	ip.addr[3] = ip_raw;
+	ip.addr[2] = ip_raw >> 8;
+	ip.addr[1] = ip_raw >> 16;
+	ip.addr[0] = ip_raw >> 24;
+	return ip;
 }
 
 
@@ -84,7 +133,7 @@ Ipv4_address Ipv4_packet::ip_from_string(const char *ip)
 
 Genode::uint16_t Ipv4_packet::calculate_checksum(Ipv4_packet const &packet)
 {
-	Genode::uint16_t const *data = packet.header<Genode::uint16_t>();
+	Genode::uint16_t const *data = (Genode::uint16_t *)&packet;
 	Genode::uint32_t const sum = host_to_big_endian(data[0])
 	                           + host_to_big_endian(data[1])
 	                           + host_to_big_endian(data[2])
@@ -100,24 +149,3 @@ Genode::uint16_t Ipv4_packet::calculate_checksum(Ipv4_packet const &packet)
 
 const Ipv4_address Ipv4_packet::CURRENT((Genode::uint8_t)0x00);
 const Ipv4_address Ipv4_packet::BROADCAST((Genode::uint8_t)0xFF);
-
-
-void Ipv4_address_prefix::print(Genode::Output &output) const
-{
-	Genode::print(output, address, "/", prefix);
-}
-
-bool Ipv4_address_prefix::prefix_matches(Ipv4_address const &ip) const
-{
-	uint8_t prefix_left = prefix;
-	uint8_t byte = 0;
-	for (; prefix_left >= 8; prefix_left -= 8, byte++) {
-		if (ip.addr[byte] != address.addr[byte]) {
-			return false; }
-	}
-	if (prefix_left == 0) {
-		return true; }
-
-	uint8_t const mask = ~(0xff >> prefix_left);
-	return !((ip.addr[byte] ^ address.addr[byte]) & mask);
-}

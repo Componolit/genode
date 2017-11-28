@@ -723,6 +723,11 @@ int Libc::Vfs_plugin::ioctl(Libc::File_descriptor *fd, int request, char *argp)
 
 	case DIOCGMEDIASIZE:
 		{
+			if (!argp) {
+				errno = EINVAL;
+				return -1;
+			}
+
 			opcode = Opcode::IOCTL_OP_DIOCGMEDIASIZE;
 			arg    = 0;
 			break;
@@ -775,7 +780,7 @@ int Libc::Vfs_plugin::ioctl(Libc::File_descriptor *fd, int request, char *argp)
 			/* resolve ambiguity with libc type */
 			using Genode::int64_t;
 
-			int64_t *disk_size = (int64_t*)arg;
+			int64_t *disk_size = (int64_t*)argp;
 			*disk_size = out.diocgmediasize.size;
 			return 0;
 		}
@@ -1106,7 +1111,7 @@ int Libc::Vfs_plugin::rename(char const *from_path, char const *to_path)
 void *Libc::Vfs_plugin::mmap(void *addr_in, ::size_t length, int prot, int flags,
                              Libc::File_descriptor *fd, ::off_t offset)
 {
-	if (prot != PROT_READ) {
+	if (prot & ~(PROT_READ|PROT_WRITE)) {
 		Genode::error("mmap for prot=", Genode::Hex(prot), " not supported");
 		errno = EACCES;
 		return (void *)-1;

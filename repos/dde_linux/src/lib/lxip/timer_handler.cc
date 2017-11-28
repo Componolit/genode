@@ -178,8 +178,11 @@ class Lx::Timer
 				if (ctx->timeout > jiffies)
 					break;
 
+				ctx->pending = false;
 				ctx->function();
-				del(ctx->timer);
+
+				if (!ctx->pending)
+					del(ctx->timer);
 			}
 
 			/* tick the higher layer of the component */
@@ -227,7 +230,7 @@ class Lx::Timer
 			if (!ctx)
 				return 0;
 
-			int rv = ctx->timeout != Context::INVALID_TIMEOUT ? 1 : 0;
+			int rv = ctx->pending ? 1 : 0;
 
 			_list.remove(ctx);
 			destroy(&_timer_alloc, ctx);
@@ -250,7 +253,7 @@ class Lx::Timer
 			 * If timer was already active return 1, otherwise 0. The return
 			 * value is needed by mod_timer().
 			 */
-			int rv = ctx->timeout != Context::INVALID_TIMEOUT ? 1 : 0;
+			int rv = ctx->pending ? 1 : 0;
 
 			_schedule_timer(ctx, expires);
 
@@ -360,3 +363,6 @@ int del_timer(struct timer_list *timer)
 
 	return rv;
 }
+
+
+void Lx::timer_update_jiffies() { update_jiffies(); }

@@ -13,37 +13,25 @@
 
 /* core includes */
 #include <cpu.h>
+#include <kernel/thread.h>
 #include <kernel/pd.h>
 
-extern int _mt_begin;
-extern int _mt_tss;
-extern int _mt_idt;
-extern int _mt_gdt_start;
-extern int _mt_gdt_end;
+extern int __tss;
+extern int __idt;
+extern int __gdt_start;
+extern int __gdt_end;
 
 
-Genode::addr_t Genode::Cpu::virt_mtc_addr(Genode::addr_t virt_base,
-                                          Genode::addr_t label) {
-	return virt_base + (label - (addr_t)&_mt_begin); }
-
-
-void Genode::Cpu::Context::init(addr_t const table, bool core)
+Genode::Cpu::Context::Context(bool core)
 {
-	/* Constants to handle IF, IOPL values */
-	enum {
-		EFLAGS_IF_SET = 1 << 9,
-		EFLAGS_IOPL_3 = 3 << 12,
-	};
-
-	cr3 = Cr3::init(table);
-
-	/*
-	 * Enable interrupts for all threads, set I/O privilege level
-	 * (IOPL) to 3 for core threads to allow UART access.
-	 */
 	eflags = EFLAGS_IF_SET;
-	if (core) eflags |= EFLAGS_IOPL_3;
+	cs     = core ? 0x8 : 0x1b;
+	ss     = core ? 0x10 : 0x23;
 }
+
+
+Genode::Cpu::Mmu_context::Mmu_context(addr_t const table)
+: cr3(Cr3::Pdb::masked(table)) {}
 
 
 void Genode::Cpu::Tss::init()
@@ -56,16 +44,44 @@ void Genode::Cpu::Tss::init()
 void Genode::Cpu::Idt::init()
 {
 	Pseudo_descriptor descriptor {
-		(uint16_t)((addr_t)&_mt_tss - (addr_t)&_mt_idt),
-		(uint64_t)(virt_mtc_addr(exception_entry, (addr_t)&_mt_idt)) };
+		(uint16_t)((addr_t)&__tss - (addr_t)&__idt),
+		(uint64_t)(&__idt) };
 	asm volatile ("lidt %0" : : "m" (descriptor));
 }
 
 
 void Genode::Cpu::Gdt::init()
 {
-	addr_t const   start = (addr_t)&_mt_gdt_start;
-	uint16_t const limit = _mt_gdt_end - _mt_gdt_start - 1;
-	uint64_t const base  = virt_mtc_addr(exception_entry, start);
+	addr_t const   start = (addr_t)&__gdt_start;
+	uint16_t const limit = __gdt_end - __gdt_start - 1;
+	uint64_t const base  = start;
 	asm volatile ("lgdt %0" :: "m" (Pseudo_descriptor(limit, base)));
+}
+
+
+void Genode::Cpu::mmu_fault(Context & regs, Kernel::Thread_fault & fault)
+{
+	using Fault = Kernel::Thread_fault::Type;
+
+	/*
+	 * Intel manual: 6.15 EXCEPTION AND INTERRUPT REFERENCE
+	 *                    Interrupt 14—Page-Fault Exception (#PF)
+	 */
+	enum {
+		ERR_I = 1UL << 4,
+		ERR_R = 1UL << 3,
+		ERR_U = 1UL << 2,
+		ERR_W = 1UL << 1,
+		ERR_P = 1UL << 0,
+	};
+
+	auto fault_lambda = [] (addr_t err) {
+		if (!(err & ERR_P)) return Fault::PAGE_MISSING;
+		if (err & ERR_W)    return Fault::WRITE;
+		if (err & ERR_I)    return Fault::EXEC;
+		else                return Fault::UNKNOWN;
+	};
+
+	fault.addr = Genode::Cpu::Cr2::read();
+	fault.type = fault_lambda(regs.errcode);
 }

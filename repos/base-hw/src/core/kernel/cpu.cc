@@ -120,19 +120,21 @@ Cpu_job::~Cpu_job()
 }
 
 
-/**************
- ** Cpu_idle **
- **************/
-
-void Cpu_idle::proceed(unsigned const cpu) { mtc()->switch_to_user(this, cpu); }
-
-
-void Cpu_idle::_main() { while (1) { Genode::Cpu::wait_for_interrupt(); } }
-
-
 /*********
  ** Cpu **
  *********/
+
+extern "C" void idle_thread_main(void);
+
+Cpu::Idle_thread::Idle_thread(Cpu * const cpu)
+: Thread("idle")
+{
+	regs->ip = (addr_t)&idle_thread_main;
+
+	affinity(cpu);
+	Thread::_pd = core_pd();
+}
+
 
 void Cpu::set_timeout(Timeout * const timeout, time_t const duration_us) {
 	_timer.set_timeout(timeout, _timer.us_to_ticks(duration_us)); }
@@ -166,7 +168,7 @@ Cpu_job & Cpu::schedule()
 	/* update scheduler */
 	time_t quota = _timer.update_time();
 	Job & old_job = scheduled_job();
-	old_job.exception(id());
+	old_job.exception(*this);
 	_timer.process_timeouts();
 	_scheduler.update(quota);
 
@@ -178,18 +180,24 @@ Cpu_job & Cpu::schedule()
 
 	_timer.schedule_timeout();
 
-	/* switch to new job */
-	switch_to(new_job);
-
 	/* return new job */
 	return new_job;
 }
 
 
+Genode::size_t  kernel_stack_size = Cpu::KERNEL_STACK_SIZE;
+Genode::uint8_t kernel_stack[NR_OF_CPUS][Cpu::KERNEL_STACK_SIZE]
+__attribute__((aligned(Genode::get_page_size())));
+
+
+addr_t Cpu::stack_start() {
+	return (addr_t)&kernel_stack + KERNEL_STACK_SIZE * (_id+1); }
+
+
 Cpu::Cpu(unsigned const id)
 :
-	_id(id), _timer(_id), _idle(this),
-	_scheduler(&_idle, _quota(), _fill()),
+	_id(id), _timer(_id),
+	_scheduler(&_idle, _quota(), _fill()), _idle(this),
 	_ipi_irq(*this), _timer_irq(_timer.interrupt_id(), *this)
 { }
 
@@ -219,39 +227,3 @@ Cpu_pool::Cpu_pool()
 
 Cpu_domain_update::Cpu_domain_update() {
 	for (unsigned i = 0; i < NR_OF_CPUS; i++) { _pending[i] = false; } }
-
-
-/*****************
- ** Cpu_context **
- *****************/
-
-/**
- * FIXME THIS IS ONLY USED BY IDLE THREAD
- * Enable kernel-entry assembly to get an exclusive stack for every CPU
- *
- * The stack alignment is determined as follows:
- *
- * 1) There is an architectural minimum alignment for stacks that originates
- *    from the assumptions that some instructions make.
- * 2) Shared cache lines between yet uncached and already cached
- *    CPUs during multiprocessor bring-up must be avoided. Thus, the alignment
- *    must be at least the maximum line size of global caches.
- * 3) The alignment that originates from 1) and 2) is assumed to be always
- *    less or equal to the minimum page size.
- */
-enum { KERNEL_STACK_SIZE = 16 * 1024 * sizeof(Genode::addr_t) };
-Genode::size_t  kernel_stack_size = KERNEL_STACK_SIZE;
-Genode::uint8_t kernel_stack[NR_OF_CPUS][KERNEL_STACK_SIZE]
-__attribute__((aligned(Genode::get_page_size())));
-
-Cpu_context::Cpu_context(Hw::Page_table * const table)
-{
-	sp = (addr_t)kernel_stack;
-	ip = (addr_t)kernel;
-
-	/*
-	 * platform specific initialization, has to be done after
-	 * setting the registers by now
-	 */
-	_init(KERNEL_STACK_SIZE, (addr_t)table);
-}

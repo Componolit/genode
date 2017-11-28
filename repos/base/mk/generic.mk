@@ -109,7 +109,7 @@ NIM_ARGS += $(NIM_OPT)
 	$(MSG_BUILD)$(basename $@).cpp
 	$(VERBOSE) rm -f stdlib_*.cpp
 	$(VERBOSE)$(NIM) compileToCpp $(NIM_ARGS) $<
-	$(VERBOSE)$(JQ) --raw-output '"SRC_O_NIM +=" + (.link | join(" ")) +"\n" + (.compile | map((.[0] | sub("cpp$$";"o: ")) + .[0] + "\n\t"+(.[1] | sub("^g\\++";"$$(MSG_COMP)$$@\n\t$$(VERBOSE)$$(NIM_CC)"))) | join("\n"))'  < $(basename $(basename $@)).json > $@
+	$(VERBOSE)$(JQ) --raw-output '"SRC_O_NIM +=" + (.link | join(" ")) +"\n" + (.compile | map((.[0] | sub("cpp$$";"o: ") | sub("c$$";"o: ")) + .[0] + "\n\t"+(.[1] | sub("^g\\++";"$$(MSG_COMP)$$@\n\t$$(VERBOSE)$$(NIM_CC)"))) | join("\n"))'  < $(basename $(basename $@)).json > $@
 
 NIM_CC := $(CXX) $(CXX_DEF) $(CC_CXX_OPT) $(INCLUDES) -D__GENODE__
 
@@ -175,7 +175,7 @@ endif
 		sed -e "s/^\(\w\+\) D \(\w\+\)\$$/.data; .global \1; .type \1,%object; .size \1,\2; \1:/p" \
 		    -e "s/^\(\w\+\) V/.data; .weak \1; .type \1,%object; \1:/p" \
 		    -e "s/^\(\w\+\) T/.text; .global \1; .type \1,%function; \1:/p" \
-		    -e "s/^\(\w\+\) R/.section .rodata; .global \1; \1:/p" \
+		    -e "s/^\(\w\+\) R \(\w\+\)\$$/.section .rodata; .global \1; .type \1,%object; .size \1,\2; \1:/p" \
 		    -e "s/^\(\w\+\) W/.text; .weak \1; .type \1,%function; \1:/p" \
 		    -e "s/^\(\w\+\) B \(\w\+\)\$$/.bss; .global \1; .type \1,%object; .size \1,\2; \1:/p" \
 		    -e "s/^\(\w\+\) U/.text; .global \1; $(ASM_SYM_DEPENDENCY)/p" \

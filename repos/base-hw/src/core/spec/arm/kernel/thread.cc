@@ -12,70 +12,41 @@
  * under the terms of the GNU Affero General Public License version 3.
  */
 
-#include <kernel/thread.h>
-#include <kernel/pd.h>
+#include <kernel/cpu.h>
 #include <kernel/kernel.h>
+#include <kernel/pd.h>
+#include <kernel/thread.h>
 
 using namespace Kernel;
 
-void Kernel::Thread::_init() { cpu_exception = RESET; }
-
-
-void Thread::exception(unsigned const cpu)
+void Thread::exception(Cpu & cpu)
 {
-	switch (cpu_exception) {
-	case SUPERVISOR_CALL:
+	switch (regs->cpu_exception) {
+	case Cpu::Context::SUPERVISOR_CALL:
 		_call();
 		return;
-	case PREFETCH_ABORT:
-	case DATA_ABORT:
+	case Cpu::Context::PREFETCH_ABORT:
+	case Cpu::Context::DATA_ABORT:
 		_mmu_exception();
 		return;
-	case INTERRUPT_REQUEST:
-	case FAST_INTERRUPT_REQUEST:
-		_interrupt(cpu);
+	case Cpu::Context::INTERRUPT_REQUEST:
+	case Cpu::Context::FAST_INTERRUPT_REQUEST:
+		_interrupt(cpu.id());
 		return;
-	case UNDEFINED_INSTRUCTION:
-		if (_cpu->retry_undefined_instr(*this)) { return; }
+	case Cpu::Context::UNDEFINED_INSTRUCTION:
+		if (_cpu->retry_undefined_instr(*regs)) { return; }
 		Genode::warning(*this, ": undefined instruction at ip=",
-		                Genode::Hex(ip));
+		                Genode::Hex(regs->ip));
 		_die();
 		return;
-	case RESET:
+	case Cpu::Context::RESET:
 		return;
 	default:
 		Genode::warning(*this, ": triggered an unknown exception ",
-		                cpu_exception);
+		                regs->cpu_exception);
 		_die();
 		return;
 	}
-}
-
-
-void Thread::_mmu_exception()
-{
-	_become_inactive(AWAITS_RESTART);
-	if (in_fault(_fault_addr, _fault_writes)) {
-		_fault_pd = (addr_t)_pd->platform_pd();
-
-		/*
-		 * Core should never raise a page-fault. If this happens, print out an
-		 * error message with debug information.
-		 */
-		if (_pd == Kernel::core_pd())
-			Genode::error("page fault in core thread (", label(), "): "
-			              "ip=", Genode::Hex(ip), " fault=", Genode::Hex(_fault_addr));
-
-		if (_pager) _pager->submit(1);
-		return;
-	}
-	Genode::error(*this, ": raised unhandled ",
-	              cpu_exception == DATA_ABORT ? "data abort" : "prefetch abort", " "
-	              "DFSR=", Genode::Hex(Cpu::Dfsr::read()), " "
-	              "ISFR=", Genode::Hex(Cpu::Ifsr::read()), " "
-	              "DFAR=", Genode::Hex(Cpu::Dfar::read()), " "
-	              "ip=",   Genode::Hex(ip),                " "
-	              "sp=",   Genode::Hex(sp));
 }
 
 
@@ -92,7 +63,7 @@ void Kernel::Thread::_call_update_data_region()
 	 *        address space so we can use virtual addresses of the caller. Up
 	 *        until then we apply operations to caches as a whole instead.
 	 */
-	if (!_core()) {
+	if (!_core) {
 		cpu->clean_invalidate_data_cache();
 		return;
 	}
@@ -116,7 +87,7 @@ void Kernel::Thread::_call_update_instr_region()
 	 *        address space so we can use virtual addresses of the caller. Up
 	 *        until then we apply operations to caches as a whole instead.
 	 */
-	if (!_core()) {
+	if (!_core) {
 		cpu->clean_invalidate_data_cache();
 		cpu->invalidate_instr_cache();
 		return;
@@ -126,3 +97,34 @@ void Kernel::Thread::_call_update_instr_region()
 	cpu->clean_invalidate_data_cache_by_virt_region(base, size);
 	cpu->invalidate_instr_cache_by_virt_region(base, size);
 }
+
+
+extern void * kernel_stack;
+
+void Thread::proceed(Cpu & cpu)
+{
+	cpu.switch_to(*regs, pd()->mmu_regs);
+
+	regs->cpu_exception = cpu.stack_start();
+
+	asm volatile("mov  sp, %0        \n"
+	             "msr  spsr_cxsf, %1 \n"
+	             "mov  lr, %2        \n"
+	             "ldm  sp, {r0-r14}^ \n"
+	             "subs pc, lr, #0    \n"
+	             :: "r" (static_cast<Cpu::Context*>(&*regs)),
+	                "r" (regs->cpsr), "r" (regs->ip));
+}
+
+
+void Thread::user_arg_0(Kernel::Call_arg const arg) { regs->r0 = arg; }
+void Thread::user_arg_1(Kernel::Call_arg const arg) { regs->r1 = arg; }
+void Thread::user_arg_2(Kernel::Call_arg const arg) { regs->r2 = arg; }
+void Thread::user_arg_3(Kernel::Call_arg const arg) { regs->r3 = arg; }
+void Thread::user_arg_4(Kernel::Call_arg const arg) { regs->r4 = arg; }
+
+Kernel::Call_arg Thread::user_arg_0() const { return regs->r0; }
+Kernel::Call_arg Thread::user_arg_1() const { return regs->r1; }
+Kernel::Call_arg Thread::user_arg_2() const { return regs->r2; }
+Kernel::Call_arg Thread::user_arg_3() const { return regs->r3; }
+Kernel::Call_arg Thread::user_arg_4() const { return regs->r4; }

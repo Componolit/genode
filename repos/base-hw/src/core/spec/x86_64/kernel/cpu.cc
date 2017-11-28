@@ -12,29 +12,15 @@
  * under the terms of the GNU Affero General Public License version 3.
  */
 
-/* Genode includes */
-#include <base/log.h>
-
 /* core includes */
 #include <kernel/cpu.h>
 #include <kernel/kernel.h>
 #include <kernel/pd.h>
 
-using namespace Kernel;
-
-
-Cpu_idle::Cpu_idle(Cpu * const cpu) : Cpu_job(Cpu_priority::MIN, 0)
-{
-	Cpu::Gdt::init();
-	Cpu_job::cpu(cpu);
-	ip = (addr_t)&_main;
-	sp = (addr_t)&_stack[stack_size];
-	init((addr_t)core_pd()->translation_table(), true);
-}
-
 
 void Kernel::Cpu::init(Pic &pic)
 {
+	Cpu::Gdt::init();
 	Idt::init();
 	Tss::init();
 
@@ -48,4 +34,4 @@ void Kernel::Cpu::init(Pic &pic)
 }
 
 
-void Cpu_domain_update::_domain_update() { }
+void Kernel::Cpu_domain_update::_domain_update() { }

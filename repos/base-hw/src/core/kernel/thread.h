@@ -15,17 +15,32 @@
 #define _CORE__KERNEL__THREAD_H_
 
 /* core includes */
+#include <cpu.h>
 #include <kernel/signal_receiver.h>
 #include <kernel/ipc_node.h>
-#include <kernel/cpu.h>
+#include <kernel/cpu_context.h>
 #include <kernel/object.h>
 #include <base/signal.h>
 
 namespace Kernel
 {
+	struct Thread_fault;
 	class Thread;
 	class Core_thread;
 }
+
+
+struct Kernel::Thread_fault
+{
+	enum Type { WRITE, EXEC, PAGE_MISSING, UNKNOWN };
+
+	addr_t ip    = 0;
+	addr_t addr  = 0;
+	Type   type  = UNKNOWN;
+
+	void print(Genode::Output &out) const;
+};
+
 
 /**
  * Kernel back-end for userland execution-contexts
@@ -36,9 +51,7 @@ class Kernel::Thread
 	public Ipc_node, public Signal_context_killer, public Signal_handler,
 	private Timeout
 {
-	friend class Core_thread;
-
-	private:
+	protected:
 
 		enum { START_VERBOSE = 0 };
 
@@ -54,17 +67,14 @@ class Kernel::Thread
 		};
 
 		Signal_context *   _pager = nullptr;
-		addr_t             _fault_pd;
-		addr_t             _fault_addr;
-		addr_t             _fault_writes;
+		Thread_fault       _fault;
 		State              _state;
 		Signal_receiver *  _signal_receiver;
 		char const * const _label;
 		capid_t            _timeout_sigid = 0;
 		bool               _paused = false;
 		bool               _cancel_next_await_signal = false;
-
-		void _init();
+		bool const         _core = false;
 
 		/**
 		 * Notice that another thread yielded the CPU to this thread
@@ -82,11 +92,6 @@ class Kernel::Thread
 		 */
 		int _route_event(unsigned         const event_id,
 		                 Signal_context * const signal_context_id);
-
-		/**
-		 * Return wether this is a core thread
-		 */
-		bool _core() const;
 
 		/**
 		 * Switch from an inactive state to the active state
@@ -138,6 +143,7 @@ class Kernel::Thread
 		 *********************************************************/
 
 		void _call_new_thread();
+		void _call_new_core_thread();
 		void _call_thread_quota();
 		void _call_start_thread();
 		void _call_stop_thread();
@@ -226,15 +232,43 @@ class Kernel::Thread
 
 	public:
 
+		Genode::Align_at<Genode::Cpu::Context> regs;
+
 		/**
 		 * Constructor
 		 *
 		 * \param priority  scheduling priority
 		 * \param quota     CPU-time quota
 		 * \param label     debugging label
+		 * \param core      whether it is a core thread or not
 		 */
 		Thread(unsigned const priority, unsigned const quota,
-		       char const * const label);
+		       char const * const label, bool core = false);
+
+		/**
+		 * Constructor for core/kernel thread
+		 *
+		 * \param label  debugging label
+		 */
+		Thread(char const * const label)
+		: Thread(Cpu_priority::MIN, 0, label, true) { }
+
+
+		/**************************
+		 ** Support for syscalls **
+		 **************************/
+
+		void user_arg_0(Kernel::Call_arg const arg);
+		void user_arg_1(Kernel::Call_arg const arg);
+		void user_arg_2(Kernel::Call_arg const arg);
+		void user_arg_3(Kernel::Call_arg const arg);
+		void user_arg_4(Kernel::Call_arg const arg);
+
+		Kernel::Call_arg user_arg_0() const;
+		Kernel::Call_arg user_arg_1() const;
+		Kernel::Call_arg user_arg_2() const;
+		Kernel::Call_arg user_arg_3() const;
+		Kernel::Call_arg user_arg_4() const;
 
 		/**
 		 * Syscall to create a thread
@@ -255,6 +289,20 @@ class Kernel::Thread
 		}
 
 		/**
+		 * Syscall to create a core thread
+		 *
+		 * \param p         memory donation for the new kernel thread object
+		 * \param label     debugging label of the new thread
+		 *
+		 * \retval capability id of the new kernel object
+		 */
+		static capid_t syscall_create(void * const p, char const * const label)
+		{
+			return call(call_id_new_core_thread(), (Call_arg)p,
+			            (Call_arg)label);
+		}
+
+		/**
 		 * Syscall to destroy a thread
 		 *
 		 * \param thread  pointer to thread kernel object
@@ -269,8 +317,8 @@ class Kernel::Thread
 		 ** Cpu_job **
 		 *************/
 
-		void exception(unsigned const cpu);
-		void proceed(unsigned const cpu);
+		void exception(Cpu & cpu);
+		void proceed(Cpu & cpu);
 		Cpu_job * helping_sink();
 
 
@@ -285,25 +333,19 @@ class Kernel::Thread
 		 ** Accessors **
 		 ***************/
 
-		char const * label()  const { return _label; }
-		addr_t fault_pd()     const { return _fault_pd; }
-		addr_t fault_addr()   const { return _fault_addr; }
-		addr_t fault_writes() const { return _fault_writes; }
+		char const * label() const { return _label; }
+		Thread_fault fault() const { return _fault; }
 };
 
 
 /**
  * The first core thread in the system bootstrapped by the Kernel
  */
-class Kernel::Core_thread : public Core_object<Kernel::Thread>
+struct Kernel::Core_thread : Core_object<Kernel::Thread>
 {
-	private:
+	Core_thread();
 
-		Core_thread();
-
-	public:
-
-		static Thread & singleton();
+	static Thread & singleton();
 };
 
 #endif /* _CORE__KERNEL__THREAD_H_ */

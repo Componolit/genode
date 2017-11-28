@@ -15,6 +15,7 @@
 #include <hw/assert.h>
 
 #include <platform_pd.h>
+#include <kernel/cpu.h>
 #include <kernel/vm.h>
 
 namespace Kernel
@@ -37,9 +38,20 @@ namespace Kernel
 
 using namespace Kernel;
 
-extern void *         _vt_vm_entry;
-extern void *         _vt_host_entry;
-extern Genode::addr_t _vt_vm_context_ptr;
+extern "C" void   kernel();
+extern     void * kernel_stack;
+extern "C" void   hypervisor_enter_vm(Cpu::Context*);
+
+struct Host_context {
+	addr_t                    sp;
+	addr_t                    ip;
+	Cpu::Ttbr_64bit::access_t ttbr0;
+	Cpu::Ttbr_64bit::access_t ttbr1;
+	Cpu::Sctlr::access_t      sctlr;
+	Cpu::Ttbcr::access_t      ttbcr;
+	Cpu::Mair0::access_t      mair0;
+	Cpu::Dacr::access_t       dacr;
+} vt_host_context;
 
 
 struct Kernel::Vm_irq : Kernel::Irq
@@ -160,7 +172,7 @@ struct Kernel::Virtual_timer
 	/**
 	 * Load the virtual timer state from VM state
 	 */
-	static void load(Genode::Vm_state *s, unsigned const cpu_id)
+	static void load(Genode::Vm_state *s)
 	{
 		if (s->timer_irq) timer().irq.enable();
 
@@ -200,13 +212,22 @@ Kernel::Vm::Vm(void                   * const state,
 {
 	affinity(cpu_pool()->primary_cpu());
 	Virtual_pic::pic().irq.enable();
+
+	vt_host_context.sp    = _cpu->stack_start();
+	vt_host_context.ttbr0 = Cpu::Ttbr0_64bit::read();
+	vt_host_context.ttbr1 = Cpu::Ttbr1_64bit::read();
+	vt_host_context.sctlr = Cpu::Sctlr::read();
+	vt_host_context.ttbcr = Cpu::Ttbcr::read();
+	vt_host_context.mair0 = Cpu::Mair0::read();
+	vt_host_context.dacr  = Cpu::Dacr::read();
+	vt_host_context.ip    = (addr_t) &kernel;
 }
 
 
 Kernel::Vm::~Vm() { alloc().free(_id); }
 
 
-void Kernel::Vm::exception(unsigned const cpu_id)
+void Kernel::Vm::exception(Cpu & cpu)
 {
 	Virtual_timer::save(_state);
 
@@ -214,7 +235,7 @@ void Kernel::Vm::exception(unsigned const cpu_id)
 	case Genode::Cpu_state::INTERRUPT_REQUEST:
 	case Genode::Cpu_state::FAST_INTERRUPT_REQUEST:
 		_state->gic_irq = Board::VT_MAINTAINANCE_IRQ;
-		_interrupt(cpu_id);
+		_interrupt(cpu.id());
 		break;
 	default:
 		pause();
@@ -226,12 +247,13 @@ void Kernel::Vm::exception(unsigned const cpu_id)
 }
 
 
-void Kernel::Vm::proceed(unsigned const cpu_id)
+void Kernel::Vm::proceed(Cpu &)
 {
 	/*
 	 * the following values have to be enforced by the hypervisor
 	 */
-	_state->vttbr = Cpu::Ttbr0::init((Genode::addr_t)_table, _id);
+	_state->vttbr = Cpu::Ttbr_64bit::Ba::masked((Cpu::Ttbr_64bit::access_t)_table);
+	Cpu::Ttbr_64bit::Asid::set(_state->vttbr, _id);
 
 	/*
 	 * use the following report fields not needed for loading the context
@@ -242,10 +264,9 @@ void Kernel::Vm::proceed(unsigned const cpu_id)
 	_state->hpfar = Cpu::Hcr::init();
 
 	Virtual_pic::load(_state);
-	Virtual_timer::load(_state, cpu_id);
+	Virtual_timer::load(_state);
 
-	mtc()->switch_to(reinterpret_cast<Cpu::Context*>(_state), cpu_id,
-	                 (addr_t) &_vt_vm_entry, (addr_t)&_vt_vm_context_ptr);
+	hypervisor_enter_vm(reinterpret_cast<Cpu::Context*>(_state));
 }
 
 

@@ -24,6 +24,7 @@
 
 /* core includes */
 #include <hw/assert.h>
+#include <kernel/cpu.h>
 #include <kernel/kernel.h>
 #include <kernel/thread.h>
 #include <kernel/irq.h>
@@ -37,7 +38,19 @@ extern "C" void _core_start(void);
 using namespace Kernel;
 
 
-bool Thread::_core() const { return pd() == core_pd(); }
+void Thread_fault::print(Genode::Output &out) const
+{
+	Genode::print(out, "ip=",          Genode::Hex(ip));
+	Genode::print(out, " fault-addr=", Genode::Hex(addr));
+	Genode::print(out, " type=");
+	switch (type) {
+		case WRITE:        Genode::print(out, "write-fault"); return;
+		case EXEC:         Genode::print(out, "exec-fault"); return;
+		case PAGE_MISSING: Genode::print(out, "no-page"); return;
+		case UNKNOWN:      Genode::print(out, "unknown"); return;
+	};
+}
+
 
 void Thread::_signal_context_kill_pending()
 {
@@ -146,9 +159,6 @@ Cpu_job * Thread::helping_sink() {
 	return static_cast<Thread *>(Ipc_node::helping_sink()); }
 
 
-void Thread::proceed(unsigned const cpu) { mtc()->switch_to_user(this, cpu); }
-
-
 size_t Thread::_core_to_kernel_quota(size_t const quota) const
 {
 	using Genode::Cpu_session;
@@ -166,6 +176,16 @@ void Thread::_call_new_thread()
 	char const * const label    = (char *)user_arg_4();
 	Core_object<Thread> * co =
 		Genode::construct_at<Core_object<Thread> >(p, priority, quota, label);
+	user_arg_0(co->core_capid());
+}
+
+
+void Thread::_call_new_core_thread()
+{
+	void *       const p        = (void *)user_arg_1();
+	char const * const label    = (char *)user_arg_2();
+	Core_object<Thread> * co =
+		Genode::construct_at<Core_object<Thread> >(p, label);
 	user_arg_0(co->core_capid());
 }
 
@@ -195,7 +215,6 @@ void Thread::_call_start_thread()
 
 	/* join protection domain */
 	thread->_pd = (Pd *) user_arg_3();
-	thread->_pd->admit(thread);
 	thread->Ipc_node::_init((Native_utcb *)user_arg_4(), this);
 	thread->_become_active();
 }
@@ -234,7 +253,7 @@ void Thread::_call_restart_thread()
 		return; }
 
 	Thread * const thread = pd()->cap_tree().find<Thread>(user_arg_1());
-	if (!thread || (!_core() && (pd() != thread->pd()))) {
+	if (!thread || (!_core && (pd() != thread->pd()))) {
 		warning(*this, ": failed to lookup thread ", (unsigned)user_arg_1(),
 		        " to restart it");
 		_die();
@@ -567,7 +586,7 @@ void Thread::_call()
 	case call_id_time():                     user_arg_0(Cpu_job::time()); return;
 	default:
 		/* check wether this is a core thread */
-		if (!_core()) {
+		if (!_core) {
 			Genode::warning(*this, ": not entitled to do kernel call");
 			_die();
 			return;
@@ -576,6 +595,7 @@ void Thread::_call()
 	/* switch over kernel calls that are restricted to core */
 	switch (call_id) {
 	case call_id_new_thread():             _call_new_thread(); return;
+	case call_id_new_core_thread():        _call_new_core_thread(); return;
 	case call_id_thread_quota():           _call_thread_quota(); return;
 	case call_id_delete_thread():          _call_delete<Thread>(); return;
 	case call_id_start_thread():           _call_start_thread(); return;
@@ -613,15 +633,30 @@ void Thread::_call()
 }
 
 
-Thread::Thread(unsigned const priority, unsigned const quota,
-                       char const * const label)
-:
-	Cpu_job(priority, quota), _fault_pd(0), _fault_addr(0),
-	_fault_writes(0), _state(AWAITS_START),
-	_signal_receiver(0), _label(label)
+void Thread::_mmu_exception()
 {
-	_init();
+	_become_inactive(AWAITS_RESTART);
+	Cpu::mmu_fault(*regs, _fault);
+	_fault.ip = regs->ip;
+
+	if (_fault.type == Thread_fault::UNKNOWN) {
+		Genode::error(*this, " raised unhandled MMU fault ", _fault);
+		return;
+	}
+
+	if (_core)
+		Genode::error(*this, " raised a fault, which should never happen ",
+	                  _fault);
+
+	if (_pager) _pager->submit(1);
 }
+
+
+Thread::Thread(unsigned const priority, unsigned const quota,
+               char const * const label, bool core)
+:
+	Cpu_job(priority, quota), _state(AWAITS_START),
+	_signal_receiver(0), _label(label), _core(core), regs(core) { }
 
 
 void Thread::print(Genode::Output &out) const
@@ -640,7 +675,7 @@ Genode::uint8_t __initial_stack_base[DEFAULT_STACK_SIZE];
  *****************/
 
 Core_thread::Core_thread()
-: Core_object<Thread>(Cpu_priority::MAX, 0, "core")
+: Core_object<Thread>("core")
 {
 	using namespace Genode;
 
@@ -657,13 +692,12 @@ Core_thread::Core_thread()
 	utcb->cap_add(cap_id_invalid());
 
 	/* start thread with stack pointer at the top of stack */
-	sp = (addr_t)&__initial_stack_base[0] + DEFAULT_STACK_SIZE;
-	ip = (addr_t)&_core_start;
+	regs->sp = (addr_t)&__initial_stack_base[0] + DEFAULT_STACK_SIZE;
+	regs->ip = (addr_t)&_core_start;
 
 	affinity(cpu_pool()->primary_cpu());
 	_utcb       = utcb;
 	Thread::_pd = core_pd();
-	Thread::_pd->admit(this);
 	_become_active();
 }
 

@@ -65,9 +65,11 @@ struct Genode::Mapping : Hw::Mapping
 	        Cache_attribute cacheable,
 	        bool io,
 	        unsigned size_log2,
-	        bool writeable)
+	        bool writeable,
+	        bool executable)
 	: Hw::Mapping(phys, virt, 1 << size_log2,
-	              { writeable ? Hw::RW : Hw::RO, Hw::EXEC, Hw::USER,
+	              { writeable ? Hw::RW : Hw::RO,
+	                executable ? Hw::EXEC : Hw::NO_EXEC, Hw::USER,
 	                Hw::NO_GLOBAL, io ? Hw::DEVICE : Hw::RAM, cacheable }) {}
 
 	void prepare_map_operation() const {}
@@ -78,18 +80,8 @@ class Genode::Ipc_pager
 {
 	protected:
 
-		/**
-		 * Page-fault data that is read from the faulters thread registers
-		 */
-		struct Fault_thread_regs
-		{
-			addr_t ip;
-			addr_t addr;
-			addr_t writes;
-			addr_t signal;
-		} _fault;
-
-		Mapping _mapping;
+		Kernel::Thread_fault _fault;
+		Mapping              _mapping;
 
 	public:
 
@@ -107,6 +99,11 @@ class Genode::Ipc_pager
 		 * Access direction of current page fault
 		 */
 		bool write_fault() const;
+
+		/**
+		 * Executable permission fault
+		 */
+		bool exec_fault() const; 
 
 		/**
 		 * Input mapping data as reply to current page fault

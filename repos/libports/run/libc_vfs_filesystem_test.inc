@@ -116,8 +116,8 @@ append_if $use_ahci config {
 			<any-service> <parent /> <any-child /></any-service>
 		</route>
 		<config>
-			<policy label_prefix="test-libc_vfs" device="0" />
-			<policy label_prefix="vfs" device="0" />
+			<policy label_prefix="test-libc_vfs" device="0" writeable="yes"/>
+			<policy label_prefix="vfs" device="0" writeable="yes"/>
 		</config>
 	</start>}
 
@@ -160,8 +160,7 @@ install_config $config
 
 # generic modules
 append boot_modules {
-	libc.lib.so libm.lib.so posix.lib.so
-	test-libc_vfs
+	libc.lib.so test-libc_vfs
 }
 
 lappend boot_modules {*}$test_boot_modules

@@ -57,7 +57,7 @@ void Platform_thread::quota(size_t const quota) {
 
 Platform_thread::Platform_thread(const char * const label,
                                  Native_utcb * utcb)
-: Kernel_object<Kernel::Thread>(true, Kernel::Cpu_priority::MAX, 0, _label),
+: Kernel_object<Kernel::Thread>(true, _label),
   _pd(Kernel::core_pd()->platform_pd()),
   _pager(nullptr),
   _utcb_core_addr(utcb),
@@ -142,7 +142,7 @@ int Platform_thread::start(void * const ip, void * const sp)
 				error("invalid RM client");
 				return -1;
 			};
-			_utcb_pd_addr           = utcb_main_thread();
+			_utcb_pd_addr = (Native_utcb *)user_utcb_main_thread();
 			Hw::Address_space * as = static_cast<Hw::Address_space*>(&*locked_ptr);
 			if (!as->insert_translation((addr_t)_utcb_pd_addr, dsc->phys_addr(),
 			                            sizeof(Native_utcb), Hw::PAGE_FLAGS_UTCB)) {
@@ -155,8 +155,8 @@ int Platform_thread::start(void * const ip, void * const sp)
 	}
 
 	/* initialize thread registers */
-	kernel_object()->ip = reinterpret_cast<addr_t>(ip);
-	kernel_object()->sp = reinterpret_cast<addr_t>(sp);
+	kernel_object()->regs->ip = reinterpret_cast<addr_t>(ip);
+	kernel_object()->regs->sp = reinterpret_cast<addr_t>(sp);
 
 	/* start executing new thread */
 	if (!_pd) {
@@ -197,14 +197,14 @@ Genode::Pager_object * Platform_thread::pager() { return _pager; }
 
 Thread_state Platform_thread::state()
 {
-	Thread_state_base bstate(*kernel_object());
+	Thread_state_base bstate(*kernel_object()->regs);
 	return Thread_state(bstate);
 }
 
 
 void Platform_thread::state(Thread_state thread_state)
 {
-	Cpu_state * cstate = static_cast<Cpu_state *>(kernel_object());
+	Cpu_state * cstate = static_cast<Cpu_state *>(&*kernel_object()->regs);
 	*cstate = static_cast<Cpu_state>(thread_state);
 }
 

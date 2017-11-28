@@ -104,6 +104,7 @@ Framebuffer::Driver::_preferred_mode(drm_connector *connector)
 
 			unsigned long width  = 0;
 			unsigned long height = 0;
+			long hz = xn.attribute_value("hz", 0L);
 			xn.attribute("width").value(&width);
 			xn.attribute("height").value(&height);
 
@@ -111,7 +112,8 @@ Framebuffer::Driver::_preferred_mode(drm_connector *connector)
 			list_for_each_entry(mode, &connector->modes, head) {
 			if (mode->hdisplay == (int) width &&
 				mode->vdisplay == (int) height)
-				return mode;
+				if (!hz || hz == mode->vrefresh)
+					return mode;
 		};
 		}
 	} catch (...) {
@@ -186,6 +188,12 @@ void Framebuffer::Driver::update_mode()
 		                       lx_c_set_mode(lx_drm_device, c, _config._lx.lx_fb,
 		                                      _preferred_mode(c)); });
 	}
+
+	/* force virtual framebuffer size if requested */
+	if (int w = _session.force_width_from_config())
+		_config._lx.width = min(_config._lx.width, w);
+	if (int h = _session.force_height_from_config())
+		_config._lx.height = min(_config._lx.height, h);
 
 	if (old._lx.addr)  Lx::iounmap(old._lx.addr);
 	/* drm_crtc.h in drm_framebuffer_funcs definition: use drm_fb_remove */

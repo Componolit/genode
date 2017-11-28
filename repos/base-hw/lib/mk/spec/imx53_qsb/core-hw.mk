@@ -11,7 +11,6 @@ INC_DIR += $(REP_DIR)/src/core/spec/imx53
 
 SRC_CC += spec/imx53/pic.cc
 SRC_CC += spec/imx53/timer.cc
-SRC_CC += spec/arm/cpu_context_trustzone.cc
 
 ifneq ($(filter-out $(SPECS),trustzone),)
 SRC_CC += kernel/vm_thread_off.cc
@@ -26,7 +25,7 @@ SRC_CC += spec/arm_v7/trustzone/kernel/vm.cc
 SRC_CC += spec/arm_v7/vm_session_component.cc
 SRC_CC += spec/arm_v7/trustzone/vm_session_component.cc
 
-SRC_S += spec/arm_v7/trustzone/mode_transition.s
+SRC_S += spec/arm_v7/trustzone/exception_vector.s
 endif
 
 # include less specific configuration

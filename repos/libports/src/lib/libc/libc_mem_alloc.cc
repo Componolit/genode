@@ -16,7 +16,6 @@
 /* Genode includes */
 #include <base/env.h>
 #include <base/allocator_avl.h>
-#include <base/sleep.h>
 
 /* local includes */
 #include "libc_mem_alloc.h"
@@ -37,10 +36,12 @@ Libc::Mem_alloc_impl::Dataspace_pool::~Dataspace_pool()
 		 */
 
 		Ram_dataspace_capability ds_cap = ds->cap;
+		void const * const local_addr = ds->local_addr;
 
 		remove(ds);
 		delete ds;
-		_region_map->detach(ds->local_addr);
+
+		_region_map->detach(local_addr);
 		_ram_session->free(ds_cap);
 	}
 }
@@ -54,7 +55,10 @@ int Libc::Mem_alloc_impl::Dataspace_pool::expand(size_t size, Range_allocator *a
 	/* make new ram dataspace available at our local address space */
 	try {
 		new_ds_cap = _ram_session->alloc(size);
-		local_addr = _region_map->attach(new_ds_cap);
+
+		enum { MAX_SIZE = 0, NO_OFFSET = 0, ANY_LOCAL_ADDR = false };
+		local_addr = _region_map->attach(new_ds_cap, MAX_SIZE, NO_OFFSET,
+		                                 ANY_LOCAL_ADDR, nullptr, _executable);
 	}
 	catch (Out_of_ram) { return -2; }
 	catch (Out_of_caps) { return -4; }
@@ -138,13 +142,19 @@ Genode::size_t Libc::Mem_alloc_impl::size_at(void const *addr) const
 }
 
 
-static Libc::Mem_alloc *_libc_mem_alloc;
+static Libc::Mem_alloc *_libc_mem_alloc_rw  = nullptr;
+static Libc::Mem_alloc *_libc_mem_alloc_rwx = nullptr;
 
 
 static void _init_mem_alloc(Genode::Region_map &rm, Genode::Ram_session &ram)
 {
-	static Libc::Mem_alloc_impl inst(rm, ram);
-	_libc_mem_alloc = &inst;
+	enum { MEMORY_EXECUTABLE = true };
+
+	static Libc::Mem_alloc_impl inst_rw(rm, ram, !MEMORY_EXECUTABLE);
+	static Libc::Mem_alloc_impl inst_rwx(rm, ram, MEMORY_EXECUTABLE);
+
+	_libc_mem_alloc_rw  = &inst_rw;
+	_libc_mem_alloc_rwx = &inst_rwx;
 }
 
 
@@ -157,12 +167,10 @@ namespace Libc {
 }
 
 
-Libc::Mem_alloc *Libc::mem_alloc()
+Libc::Mem_alloc *Libc::mem_alloc(bool executable)
 {
-	if (!_libc_mem_alloc) {
+	if (!_libc_mem_alloc_rw || !_libc_mem_alloc_rwx)
 		error("attempt to use 'Libc::mem_alloc' before call of 'init_mem_alloc'");
-		_init_mem_alloc(*env_deprecated()->rm_session(), *env_deprecated()->ram_session());
-	}
-	return _libc_mem_alloc;
-}
 
+	return executable ? _libc_mem_alloc_rwx : _libc_mem_alloc_rw;
+}

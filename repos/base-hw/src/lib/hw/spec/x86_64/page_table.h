@@ -100,17 +100,6 @@ namespace Hw
 			D::clear(value);
 			return value;
 		}
-
-		/**
-		 * Merge access rights of descriptor with given flags.
-		 */
-		static void merge_access_rights(access_t &desc,
-		                                Page_flags const &flags)
-		{
-			Rw::set(desc, Rw::get(desc) | flags.writeable);
-			Us::set(desc, Us::get(desc) | !flags.privileged);
-			Xd::set(desc, Xd::get(desc) & !flags.executable);
-		}
 	};
 }
 
@@ -341,10 +330,11 @@ class Hw::Page_directory
 			struct Mt : Base::template Bitset_2<Base::Pwt,
 			                                    Base::Pcd> { };
 
-			static typename Base::access_t create(Page_flags const &flags,
-			                                      addr_t const pa)
+			static typename Base::access_t create(addr_t const pa)
 			{
 				/* XXX: Set memory type depending on active PAT */
+				static Page_flags flags { RW, EXEC, USER, NO_GLOBAL,
+				                          RAM, Genode::CACHED };
 				return Base::create(flags) | Pa::masked(pa);
 			}
 		};
@@ -388,12 +378,10 @@ class Hw::Page_directory
 
 					/* create and link next level table */
 					ENTRY & table = alloc.construct<ENTRY>();
-					desc = (access_t) Td::create(flags, alloc.phys_addr(table));
+					desc = (access_t) Td::create(alloc.phys_addr(table));
 
 				} else if (Descriptor::maps_page(desc)) {
 					throw Double_insertion();
-				} else {
-					Descriptor::merge_access_rights(desc, flags);
 				}
 
 				/* insert translation */
@@ -528,9 +516,11 @@ class Hw::Pml4_table
 			struct Pa  : Bitfield<12, SIZE_LOG2> { };    /* physical address */
 			struct Mt  : Genode::Bitset_2<Pwt, Pcd> { }; /* memory type      */
 
-			static access_t create(Page_flags const &flags, addr_t const pa)
+			static access_t create(addr_t const pa)
 			{
 				/* XXX: Set memory type depending on active PAT */
+				static Page_flags flags { RW, EXEC, USER, NO_GLOBAL,
+				                          RAM, Genode::CACHED };
 				return Common_descriptor::create(flags) | Pa::masked(pa);
 			}
 		};
@@ -556,9 +546,7 @@ class Hw::Pml4_table
 				if (!Descriptor::present(desc)) {
 					/* create and link next level table */
 					ENTRY & table = alloc.construct<ENTRY>();
-					desc = Descriptor::create(flags, alloc.phys_addr(table));
-				} else {
-					Descriptor::merge_access_rights(desc, flags);
+					desc = Descriptor::create(alloc.phys_addr(table));
 				}
 
 				/* insert translation */
@@ -633,6 +621,13 @@ class Hw::Pml4_table
 			Genode::memset(&_entries, 0, sizeof(_entries));
 		}
 
+		explicit Pml4_table(Pml4_table & kernel_table) : Pml4_table()
+		{
+			static size_t first = (0xffffffc000000000 & SIZE_MASK) >> PAGE_SIZE_LOG2;
+			for (size_t i = first; i < MAX_ENTRIES; i++)
+				_entries[i] = kernel_table._entries[i];
+		}
+
 		/**
 		 * Returns True if table does not contain any page mappings.
 		 *
@@ -668,14 +663,18 @@ class Hw::Pml4_table
 		 * \param size  region size
 		 * \param alloc second level translation table allocator
 		 */
-		void remove_translation(addr_t vo, size_t size, Allocator & alloc) {
-			_range_op(vo, 0, size, Remove_func(alloc)); }
+		void remove_translation(addr_t vo, size_t size, Allocator & alloc)
+		{
+			_range_op(vo, 0, size, Remove_func(alloc));
+		}
 } __attribute__((aligned(1 << ALIGNM_LOG2)));
 
 
 class Hw::Page_table : public Pml4_table
 {
 	public:
+
+		using Pml4_table::Pml4_table;
 
 		enum {
 			TABLE_LEVEL_X_SIZE_LOG2 = SIZE_LOG2_4KB,
