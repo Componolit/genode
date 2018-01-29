@@ -27,41 +27,41 @@ extern "C" {
 	 */
 	struct pthread_rwlock
 	{
-	private:
+		private:
 
-		typedef enum { RWLOCK_UNLOCKED, RWLOCK_READ, RWLOCK_WRITE } State;
+			typedef enum { RWLOCK_UNLOCKED = 1, RWLOCK_READ = 2, RWLOCK_WRITE = 3} State;
 
-		/*
-		 * As POSIX defines only a single unlock operation, we need to track
-		 * the state of the lock to either perform an unlock operation for
-		 * a reader lock or a writer lock.
-		 */
-		State _state = RWLOCK_UNLOCKED;
-		Genode::Lock _nbr_mutex {};
-		Genode::Lock _global_mutex {};
-		int _nbr = 0;
+			/*
+			 * As POSIX defines only a single unlock operation, we need to track
+			 * the state of the lock to either perform an unlock operation for
+			 * a reader lock or a writer lock.
+			 */
+			State _state = RWLOCK_UNLOCKED;
+			Genode::Lock _nbr_mutex {};
+			Genode::Lock _global_mutex {};
+			int _nbr = 0;
 
-		void _begin_read()
-		{
-			Genode::Lock_guard<Genode::Lock> guard(_nbr_mutex);
-			++_nbr;
-			if (_nbr == 1) {
-				_global_mutex.lock();
+			void _begin_read()
+			{
+				Genode::Lock_guard<Genode::Lock> guard(_nbr_mutex);
+				++_nbr;
+				if (_nbr == 1) {
+					_global_mutex.lock();
+				}
 			}
-		}
 
-		void _end_read()
-		{
-			Genode::Lock_guard<Genode::Lock> guard(_nbr_mutex);
-			_nbr--;
-			if (_nbr == 0) {
-				_global_mutex.unlock();
+			void _end_read()
+			{
+				Genode::Lock_guard<Genode::Lock> guard(_nbr_mutex);
+				_nbr--;
+				if (_nbr == 0) {
+					_global_mutex.unlock();
+				}
 			}
-		}
 
-		void _begin_write() { _global_mutex.lock(); }
+			void _begin_write() { _global_mutex.lock(); }
 
-		void _end_write() { _global_mutex.unlock(); }
+			void _end_write() { _global_mutex.unlock(); }
 
 		public:
 			int rdlock()
@@ -118,29 +118,30 @@ extern "C" {
 		}
 
 		*rwlock = new struct pthread_rwlock();
-		          return 0;
-	          }
+	    return 0;
+	}
 
-	          int pthread_rwlock_destroy(pthread_rwlock_t *rwlock)
-	          {
-		          delete *rwlock;
-		          return 0;
-	          }
+	int pthread_rwlock_destroy(pthread_rwlock_t *rwlock)
+	{
+	    delete *rwlock;
+	    return 0;
+	}
 
-	          int pthread_rwlock_rdlock(pthread_rwlock_t * rwlock)
-	          {
-		          return (*rwlock)->rdlock();
-	          }
+	int pthread_rwlock_rdlock(pthread_rwlock_t * rwlock)
+	{
+	    return (*rwlock)->rdlock();
+	}
 
-	          int pthread_rwlock_wrlock(pthread_rwlock_t *rwlock)
-	          {
-		          return (*rwlock)->wrlock();
-	          }
+	int pthread_rwlock_wrlock(pthread_rwlock_t *rwlock)
+	{
+	    return (*rwlock)->wrlock();
+	}
 
-	          int pthread_rwlock_unlock(pthread_rwlock_t *rwlock)
-	          {
-		          return (*rwlock)->unlock();
-	          }
+	int pthread_rwlock_unlock(pthread_rwlock_t *rwlock)
+	{
+	    return (*rwlock)->unlock();
+	}
+
 
 	/*
 	 * Unimplemented functions:
