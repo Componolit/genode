@@ -109,6 +109,10 @@ extern "C" {
 			}
 	};
 
+	struct pthread_rwlockattr
+	{
+	};
+
 	int pthread_rwlock_init(pthread_rwlock_t *rwlock, const pthread_rwlockattr_t *attr)
 	{
 		/* We do not support attributes */
@@ -142,6 +146,32 @@ extern "C" {
 	    return (*rwlock)->unlock();
 	}
 
+	int pthread_rwlockattr_init(pthread_rwlockattr_t *attr)
+	{
+		*attr = new struct pthread_rwlockattr();
+		return 0;
+	};
+
+	int pthread_rwlockattr_getpshared(const pthread_rwlockattr_t *attr, int *pshared)
+	{
+		*pshared = PTHREAD_PROCESS_PRIVATE;
+		return 0;
+	};
+
+	int pthread_rwlockattr_setpshared(pthread_rwlockattr_t *attr, int pshared)
+	{
+		if (pshared != PTHREAD_PROCESS_PRIVATE)
+		{
+			return -1;
+		}
+		return 0;
+	};
+
+	int pthread_rwlockattr_destroy(pthread_rwlockattr_t *attr)
+	{
+		delete *attr;
+		return 0;
+	};
 
 	/*
 	 * Unimplemented functions:
@@ -149,9 +179,5 @@ extern "C" {
 	 *  int pthread_rwlock_timedwrlock(pthread_rwlock_t *, const struct timespec *);
 	 *  int pthread_rwlock_tryrdlock(pthread_rwlock_t *);
 	 *  int pthread_rwlock_trywrlock(pthread_rwlock_t *);
-	 *  int pthread_rwlockattr_init(pthread_rwlockattr_t *);
-	 *  int pthread_rwlockattr_getpshared(const pthread_rwlockattr_t *, int *);
-	 *  int pthread_rwlockattr_setpshared(pthread_rwlockattr_t *, int);
-	 *  int pthread_rwlockattr_destroy(pthread_rwlockattr_t *);
 	 */
 }
