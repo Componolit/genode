@@ -1161,11 +1161,27 @@ void *Libc::Vfs_plugin::mmap(void *addr_in, ::size_t length, int prot, int flags
 		return (void *)-1;
 	}
 
-	if (::pread(fd->libc_fd, addr, length, offset) < 0) {
-		Genode::error("mmap could not obtain file content");
-		::munmap(addr, length);
-		errno = EACCES;
-		return (void *)-1;
+	size_t remaining = length;
+	size_t read = 0;
+	char *buffer = (char *)addr;
+
+	while (remaining > 0)
+	{
+		ssize_t result = ::pread(fd->libc_fd, buffer + read, remaining, offset + read);
+
+		// Error
+		if (result < 0)
+		{
+			Genode::error("mmap could not obtain file content");
+			::munmap(addr, length);
+			errno = EACCES;
+			return (void *)-1;
+		}
+
+		if (result == 0) break;
+
+		remaining -= result;
+		read += result;
 	}
 
 	return addr;
