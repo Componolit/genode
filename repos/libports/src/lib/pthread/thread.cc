@@ -107,14 +107,18 @@ void Pthread_registry::remove(pthread_t thread)
 	Genode::error("could not remove unknown pthread from registry");
 }
 
-
-bool Pthread_registry::contains(pthread_t thread)
+unsigned int Pthread_registry::id(pthread_t thread)
 {
 	for (unsigned int i = 0; i < MAX_NUM_PTHREADS; i++)
 		if (_array[i] == thread)
-			return true;
+			return i + 1;
 
-	return false;
+	return 0;
+}
+
+bool Pthread_registry::contains(pthread_t thread)
+{
+    return id(thread) != 0;
 }
 
 
