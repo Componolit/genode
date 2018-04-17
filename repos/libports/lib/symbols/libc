@@ -278,6 +278,7 @@ getprotobyname T
 getprotobyname_r T
 getpwent W
 getpwnam W
+getpwnam_r W
 getpwuid W
 getpwuid_r W
 getrlimit W
@@ -389,6 +390,7 @@ ksem_init T
 l64a T
 l64a_r T
 labs T
+lchown W
 lcong48 T
 ldexp T
 ldiv T
