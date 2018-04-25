@@ -427,9 +427,13 @@ extern "C" void *mmap(void *addr, ::size_t length, int prot, int flags,
 {
 
 	/* handle requests for anonymous memory */
-	if (!addr && libc_fd == -1) {
+	if (libc_fd == -1) {
 		bool const executable = prot & PROT_EXEC;
-		void *start = Libc::mem_alloc(executable)->alloc(length, PAGE_SHIFT);
+		void *start = Libc::mem_alloc(executable)->alloc(length, PAGE_SHIFT, (addr_t)addr);
+		if (!start) {
+		    errno = ENOMEM;
+		    return (void *)-1;
+		}
 		mmap_registry()->insert(start, length, 0);
 		return start;
 	}

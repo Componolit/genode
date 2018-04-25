@@ -1125,15 +1125,10 @@ int Libc::Vfs_plugin::rename(char const *from_path, char const *to_path)
 void *Libc::Vfs_plugin::mmap(void *addr_in, ::size_t length, int prot, int flags,
                              Libc::File_descriptor *fd, ::off_t offset)
 {
-	if (prot != PROT_READ) {
+	// Writeable mappings are allowed for anonymous memory only
+	if (prot & PROT_WRITE && (fd->libc_fd != -1)) {
 		Genode::error("mmap for prot=", Genode::Hex(prot), " not supported");
 		errno = EACCES;
-		return (void *)-1;
-	}
-
-	if (addr_in != 0) {
-		Genode::error("mmap for predefined address not supported");
-		errno = EINVAL;
 		return (void *)-1;
 	}
 
@@ -1142,7 +1137,7 @@ void *Libc::Vfs_plugin::mmap(void *addr_in, ::size_t length, int prot, int flags
 	 *     'Vfs::Directory_service::dataspace'.
 	 */
 
-	void *addr = Libc::mem_alloc()->alloc(length, PAGE_SHIFT);
+	void *addr = Libc::mem_alloc()->alloc(length, PAGE_SHIFT, (addr_t)addr_in);
 	if (addr == (void *)-1) {
 		errno = ENOMEM;
 		return (void *)-1;
