@@ -46,8 +46,10 @@ Libc::Mem_alloc_impl::Dataspace_pool::~Dataspace_pool()
 	}
 }
 
-
-int Libc::Mem_alloc_impl::Dataspace_pool::expand(size_t size, Range_allocator *alloc)
+int Libc::Mem_alloc_impl::Dataspace_pool::expand(size_t size,
+                                                 Range_allocator *alloc,
+                                                 Range_allocator *meta_alloc,
+                                                 addr_t in_addr)
 {
 	Ram_dataspace_capability new_ds_cap;
 	void *local_addr, *ds_addr = 0;
@@ -56,9 +58,9 @@ int Libc::Mem_alloc_impl::Dataspace_pool::expand(size_t size, Range_allocator *a
 	try {
 		new_ds_cap = _ram_session->alloc(size);
 
-		enum { MAX_SIZE = 0, NO_OFFSET = 0, ANY_LOCAL_ADDR = false };
+		enum { MAX_SIZE = 0, NO_OFFSET = 0 };
 		local_addr = _region_map->attach(new_ds_cap, MAX_SIZE, NO_OFFSET,
-		                                 ANY_LOCAL_ADDR, nullptr, _executable);
+		                                 in_addr ? true : false, in_addr, _executable);
 	}
 	catch (Out_of_ram) { return -2; }
 	catch (Out_of_caps) { return -4; }
@@ -71,7 +73,7 @@ int Libc::Mem_alloc_impl::Dataspace_pool::expand(size_t size, Range_allocator *a
 	alloc->add_range((addr_t)local_addr, size);
 
 	/* now that we have new backing store, allocate Dataspace structure */
-	if (alloc->alloc_aligned(sizeof(Dataspace), &ds_addr, 2).error()) {
+	if (meta_alloc->alloc_aligned(sizeof(Dataspace), &ds_addr, 2).error()) {
 		Genode::warning("libc: could not allocate meta data - this should never happen");
 		return -1;
 	}
@@ -84,11 +86,44 @@ int Libc::Mem_alloc_impl::Dataspace_pool::expand(size_t size, Range_allocator *a
 }
 
 
-void *Libc::Mem_alloc_impl::alloc(size_t size, size_t align_log2)
+void *Libc::Mem_alloc_impl::alloc(size_t size, size_t align_log2, addr_t in_addr)
 {
 	/* serialize access of heap functions */
 	Lock::Guard lock_guard(_lock);
 
+	if (in_addr) {
+		return _alloc_addr(size, in_addr);
+	} else {
+		return _alloc_aligned(size, align_log2);
+	}
+}
+
+void *Libc::Mem_alloc_impl::_alloc_addr(size_t size, addr_t in_addr)
+{
+	/* try allocation at local fixed address allocator */
+	if (_fixed_alloc.alloc_addr(size, in_addr).ok()) {
+		return (void *)in_addr;
+	}
+	Genode::warning("libc: alloc_addr failed for ", (void *)in_addr);
+
+	// XXX Get memory for new Dataspace structure to be allocated below
+	if (_ds_pool.expand(2*align_addr(sizeof(Dataspace), 2), &_alloc, &_alloc) < 0) {
+		Genode::warning("libc: _alloc_addr: could not expand metadata pool");
+		return 0;
+	}
+
+	int rv;
+	if ((rv = _ds_pool.expand(size, &_fixed_alloc, &_alloc, in_addr)) < 0) {
+		Genode::warning("libc: could not expand dataspace pool: ", rv);
+		return 0;
+	}
+
+	/* allocate originally requested block */
+	return _fixed_alloc.alloc_addr(size, in_addr).ok() ? (void *)in_addr : 0;
+}
+
+void *Libc::Mem_alloc_impl::_alloc_aligned(size_t size, size_t align_log2)
+{
 	/* try allocation at our local allocator */
 	void *out_addr = 0;
 	if (_alloc.alloc_aligned(size, &out_addr, align_log2).ok())
@@ -112,7 +147,7 @@ void *Libc::Mem_alloc_impl::alloc(size_t size, size_t align_log2)
 		_chunk_size = min(2*_chunk_size, (size_t)MAX_CHUNK_SIZE);
 	}
 
-	if (_ds_pool.expand(align_addr(request_size, 12), &_alloc) < 0) {
+	if (_ds_pool.expand(align_addr(request_size, 12), &_alloc, &_alloc) < 0) {
 		Genode::warning("libc: could not expand dataspace pool");
 		return 0;
 	}
@@ -128,7 +163,9 @@ void Libc::Mem_alloc_impl::free(void *addr)
 	Lock::Guard lock_guard(_lock);
 
 	/* forward request to our local allocator */
+	/* XXX Need to track which allocator was used */
 	_alloc.free(addr);
+	_fixed_alloc.free(addr);
 }
 
 
