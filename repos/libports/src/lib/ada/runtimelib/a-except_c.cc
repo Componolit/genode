@@ -1,16 +1,17 @@
 
 #include <base/log.h>
+#include <util/string.h>
 
 extern "C" {
 
-    void ada__exceptions__reraise_occurrence_no_defer()
+    void raise_ada_exception(char *name, char *message)
     {
-        Genode::warning(__func__, " not implemented");
+        Genode::error(Genode::Cstring(name), " raised: ", Genode::Cstring(message));
     }
 
-    void ada__exceptions__save_occurrence()
+    void warn_unimplemented_function(char *func)
     {
-        Genode::warning(__func__, " not implemented");
+        Genode::warning(Genode::Cstring(func), " unimplemented");
     }
 
 }
