@@ -60,6 +60,30 @@ extern "C" {
         throw Ada::Exception::Range_Check();
     }
 
+    /* Index check failed */
+    void __gnat_rcheck_CE_Index_Check(char *file, int line)
+    {
+        Genode::error("Constraint Error: Index check failed in ",
+                Genode::Cstring(file), " at line ", line);
+        throw Ada::Exception::Index_Check();
+    }
+
+    /* Discriminant check failed */
+    void __gnat_rcheck_CE_Discriminant_Check(char *file, int line)
+    {
+        Genode::error("Constraint Error: Discriminant check failed in ",
+                Genode::Cstring(file), " at line ", line);
+        throw Ada::Exception::Discriminant_Check();
+    }
+
+    /* Divide by 0 */
+    void __gnat_rcheck_CE_Divide_By_Zero (char *file, int line)
+    {
+        Genode::error("Constraint Error: Divide by zero in ",
+                Genode::Cstring(file), " at line ", line);
+        throw Ada::Exception::Divide_By_Zero();
+    }
+
     void raise_ada_exception(char *name, char *message)
     {
         Genode::error(Genode::Cstring(name), " raised: ", Genode::Cstring(message));

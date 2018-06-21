@@ -11,5 +11,8 @@ namespace Ada {
         class Overflow_Check : Constraint_Error {};
         class Invalid_Data : Constraint_Error {};
         class Range_Check : Constraint_Error {};
+        class Index_Check : Constraint_Error {};
+        class Discriminant_Check : Constraint_Error {};
+        class Divide_By_Zero : Constraint_Error {};
     };
 };
