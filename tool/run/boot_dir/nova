@@ -108,7 +108,7 @@ proc run_boot_dir {binaries} {
 		puts $fh "set timeout=0"
 
 		# choose best graphic mode
-		puts $fh "set gfxpayload=auto"
+		#puts $fh "set gfxpayload=auto"
 
 		if {[have_include image/uefi]} {
 			puts $fh "insmod gfxterm"
@@ -119,8 +119,8 @@ proc run_boot_dir {binaries} {
 		}
 
 		# set this to get text console instead of graphical console
-		# puts $fh "terminal_input console"
-		# puts $fh "terminal_output console"
+		puts $fh "terminal_input console"
+		puts $fh "terminal_output console"
 
 		puts $fh "menuentry 'Genode on NOVA' {"
 		puts $fh " insmod multiboot2"
