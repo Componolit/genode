@@ -3,7 +3,7 @@ include $(REP_DIR)/lib/import/import-ada.mk
 ADALIB = $(ADA_RTS)/adalib
 ADAINCLUDE = $(ADA_RTS)/adainclude
 
-PACKAGES = system s-stoele s-secsta a-except s-arit64
+PACKAGES = system s-stoele s-secsta a-except s-arit64 i-c i-cstrin i-cexten
 
 body_exists := $(filter $1.adb,$(shell if [ -e $2/$1.adb ]; then echo $1.adb; fi))
 
@@ -21,7 +21,7 @@ CUSTOM_ADA_INCLUDE = -I- -I$(REP_DIR)/src/lib/ada/runtime -I$(ADA_RTS_SOURCE) -I
 SRC_CC += a-except_c.cc s-soflin_c.cc a-exctab_c.cc
 
 # C runtime glue code
-SRC_CC += s-secsta_c.cc libc.cc
+SRC_CC += s-secsta_c.cc libc.cc s-memory_c.cc
 
 # Ada packages that implement runtime functionality
 SRC_ADB += ss_utils.adb
