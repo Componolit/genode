@@ -30,7 +30,7 @@
 #include <base/internal/crt0.h>
 
 
-enum { ATEXIT_SIZE = 256 };
+enum { ATEXIT_SIZE = 1024 };
 
 
 /***************
