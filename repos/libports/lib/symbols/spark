@@ -133,6 +133,8 @@ interfaces__c__extensions__signed_128IP T
 interfaces__c__nul R 1
 interfaces__c__wchar_arrayIP T
 interfaces__c__wide_nul R 4
+memcmp T
+memcpy T
 platform_E D 2
 system__aamp R 1
 system__always_compatible_rep R 1

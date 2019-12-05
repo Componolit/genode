@@ -12,6 +12,7 @@ MIRROR_FROM_ADA_RT_DIR := \
 	) \
 	$(addprefix ada-runtime/src/minimal/,\
 		a-except.ads \
+		a-tags.ads \
 		i-c.ads \
 		system.ads \
 		s-arit64.ads \
@@ -21,6 +22,7 @@ MIRROR_FROM_ADA_RT_DIR := \
 		s-soflin.ads \
 		s-stalib.ads \
 		s-stoele.ads \
+		s-stoele.adb \
 	) \
 	$(addprefix ada-runtime/src/lib/,\
 		componolit.ads \
@@ -36,6 +38,7 @@ MIRROR_FROM_ADA_RT_DIR := \
 MIRROR_FROM_ADA_ALI_DIR := \
     	a-except.ali \
 	ada.ali \
+	a-tags.ali \
 	componolit-runtime-conversions.ali \
 	componolit-runtime-debug.ali \
 	componolit-runtime-exceptions.ali \

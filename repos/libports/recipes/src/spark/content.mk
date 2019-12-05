@@ -12,6 +12,8 @@ MIRROR_FROM_ADA_RT_DIR := \
 	$(addprefix ada-runtime/src/minimal/,\
 		a-except.ads \
 		a-except.adb \
+		a-tags.ads \
+		a-tags.adb \
 		i-c.ads \
 		i-c.adb \
 		system.ads \
