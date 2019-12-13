@@ -19,6 +19,7 @@
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <unistd.h>
+#include <errno.h>
 
 /* libc-internal includes */
 #include <internal/types.h>
@@ -48,6 +49,11 @@ using namespace Libc;
 template <typename Rw_func, typename Buf_type>
 static ssize_t pread_pwrite_impl(Rw_func rw_func, int fd, Buf_type buf, ::size_t count, ::off_t offset)
 {
+	if (offset < 0) {
+		errno = EINVAL;
+		return -1;
+	}
+
 	File_descriptor *fdesc = file_descriptor_allocator()->find_by_libc_fd(fd);
 	if (fdesc == 0)
 		return -1;
