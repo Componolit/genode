@@ -1235,6 +1235,11 @@ int Libc::Vfs_plugin::_legacy_ioctl(File_descriptor *fd, int request, char *argp
 
 int Libc::Vfs_plugin::ftruncate(File_descriptor *fd, ::off_t length)
 {
+	if (length < 0) {
+		errno = EINVAL;
+		return -1;
+	}
+
 	Vfs::Vfs_handle *handle = vfs_handle(fd);
 	if (fd->modified) {
 		_vfs_sync(*handle);
