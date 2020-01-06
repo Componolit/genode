@@ -150,9 +150,9 @@ void *Region_map_mmap::_map_local(Dataspace_capability ds,
 
 	if ((use_local_addr && addr_in != addr_out)
 	 || (((long)addr_out < 0) && ((long)addr_out > -4095))) {
-		error("_map_local: lx_mmap failed"
-		      "(addr_in=", addr_in, ", addr_out=", addr_out, "/", (long)addr_out, ") "
-		      "overmap=", overmap);
+		// error("_map_local: lx_mmap failed"
+		//       "(addr_in=", addr_in, ", addr_out=", addr_out, "/", (long)addr_out, ") "
+		//       "overmap=", overmap);
 		throw Region_map::Region_conflict();
 	}
 
