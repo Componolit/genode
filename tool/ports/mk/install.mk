@@ -160,9 +160,9 @@ _git_dir = $(call _assert,$(DIR($1)),Missing declaration of DIR($*))
 		($(ECHO) "Error: Undefined URL for $*"; false);
 	$(VERBOSE)dir=$(call _git_dir,$*);\
 		test -d $$dir || $(MSG_DOWNLOAD)$(URL($*)); \
-		test -d $$dir || git clone $(if $(DEPTH($*)),--depth=$(DEPTH($*)) -b $(REV($*)),) $(URL($*)) $$dir &> >(sed 's/^/$(MSG_GIT)/'); \
+		test -d $$dir || git clone --progress $(if $(DEPTH($*)),--depth=$(DEPTH($*)) -b $(REV($*)),) $(URL($*)) $$dir &> >(sed 's/^/$(MSG_GIT)/'); \
 		$(MSG_UPDATE)$$dir; \
-		cd $$dir && $(GIT) fetch $(if $(DEPTH($*)),--depth=$(DEPTH($*)),) && $(GIT) reset -q --hard HEAD && $(GIT) checkout -q $(REV($*))
+		cd $$dir && $(GIT) fetch --progress $(if $(DEPTH($*)),--depth=$(DEPTH($*)),) && $(GIT) reset --hard HEAD && $(GIT) checkout --progress $(REV($*))
 
 
 ##
