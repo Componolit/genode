@@ -870,7 +870,7 @@ extern "C" {
 		if (!attr || *attr != nullptr)
 			return EINVAL;
 
-		warning(__func__, " not implemented yet");
+		// warning(__func__, " not implemented yet");
 
 		return 0;
 	}
