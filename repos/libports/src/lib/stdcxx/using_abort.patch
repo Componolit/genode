@@ -1,0 +1,10 @@
+--- a/include/c_global/cstdlib
++++ b/include/c_global/cstdlib
+@@ -132,7 +132,6 @@
+   using ::div_t;
+   using ::ldiv_t;
+ 
+-  using ::abort;
+ #if __cplusplus >= 201703L && defined(_GLIBCXX_HAVE_ALIGNED_ALLOC)
+   using ::aligned_alloc;
+ #endif
